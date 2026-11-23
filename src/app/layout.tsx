@@ -1,10 +1,13 @@
 import type { Metadata, Viewport } from "next";
-import { Inter_Tight, JetBrains_Mono } from "next/font/google";
+import { Doto, Inter_Tight, JetBrains_Mono } from "next/font/google";
 import { site } from "@/content/site";
+import Cursor from "@/components/Cursor";
+import TransitionLayer from "@/components/TransitionLayer";
 import "./globals.css";
 
 const sans = Inter_Tight({ subsets: ["latin"], variable: "--font-sans", display: "swap" });
 const mono = JetBrains_Mono({ subsets: ["latin"], variable: "--font-mono", display: "swap" });
+const dot = Doto({ subsets: ["latin"], weight: ["500", "700", "800", "900"], variable: "--font-dot", display: "swap" });
 
 export const metadata: Metadata = {
   metadataBase: new URL(site.url),
@@ -24,12 +27,14 @@ export const viewport: Viewport = {
 
 export default function RootLayout({ children }: Readonly<{ children: React.ReactNode }>) {
   return (
-    <html lang="en" className={`${sans.variable} ${mono.variable}`}>
+    <html lang="en" className={`${sans.variable} ${mono.variable} ${dot.variable}`}>
       <body>
         <a className="skip" href="#work">
           Skip to projects
         </a>
         {children}
+        <TransitionLayer />
+        <Cursor />
       </body>
     </html>
   );

@@ -20,6 +20,12 @@ export type Project = {
   cover: string;
   /** Optional short muted clip played on hover. */
   preview?: string;
+  /** Optional full-screen background image for the project page (CRT / B&W look). */
+  scene?: string;
+  /** More screenshots for the project page (the cover is shown first). */
+  gallery?: string[];
+  /** What you did on it, one item per line. */
+  role?: string[];
   links?: {
     live?: string;
     code?: string;
@@ -35,7 +41,10 @@ export const projects: Project[] = [
     year: "2025",
     stack: ["Next.js", "TypeScript", "Firebase"],
     cover: "/projects/kotobalab/cover.webp",
+    gallery: ["/projects/kotobalab/g1.webp", "/projects/kotobalab/g2.webp"],
+    role: ["Design", "Full-stack development"],
     preview: "/projects/kotobalab/preview.mp4",
+    scene: "/projects/kotobalab/shrine-photo.webp",
     links: {
       live: "https://kotoba-lab.vercel.app",
       code: "https://github.com/KaungMyatSoe13/KotobaLab",
@@ -49,6 +58,8 @@ export const projects: Project[] = [
     year: "2025",
     stack: ["MongoDB", "Express", "React", "Node", "Cloudinary"],
     cover: "/projects/shopshop/cover.webp",
+    gallery: ["/projects/shopshop/g1.webp", "/projects/shopshop/g2.webp", "/projects/shopshop/g3.webp", "/projects/shopshop/g4.webp", "/projects/shopshop/g5.webp"],
+    role: ["Full-stack development", "Admin dashboard"],
     preview: "/projects/shopshop/preview.mp4",
     links: {
       live: "https://shop-shop-pied.vercel.app",
@@ -63,6 +74,8 @@ export const projects: Project[] = [
     year: "2025",
     stack: ["React", "Tailwind CSS"],
     cover: "/projects/myanglish/cover.webp",
+    gallery: ["/projects/myanglish/g1.webp", "/projects/myanglish/g2.webp"],
+    role: ["Frontend development"],
     preview: "/projects/myanglish/preview.mp4",
     links: {
       live: "https://myanglish-translator-peach.vercel.app",
@@ -77,6 +90,8 @@ export const projects: Project[] = [
     year: "2024",
     stack: ["React Native", "TypeScript", "Firebase"],
     cover: "/projects/peakfit/cover.webp",
+    gallery: ["/projects/peakfit/g1.webp", "/projects/peakfit/g2.webp", "/projects/peakfit/g3.webp"],
+    role: ["App development", "Admin dashboard"],
     preview: "/projects/peakfit/preview.mp4",
   },
   {
@@ -87,6 +102,8 @@ export const projects: Project[] = [
     year: "2024",
     stack: ["Python", "TensorFlow", "PyTorch", "OpenCV"],
     cover: "/projects/emoface/cover.webp",
+    gallery: ["/projects/emoface/g1.webp", "/projects/emoface/g2.webp", "/projects/emoface/g3.webp"],
+    role: ["AI / ML development"],
     links: {
       code: "https://github.com/APS4087/EMOFACE",
     },
