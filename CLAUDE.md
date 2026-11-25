@@ -489,6 +489,11 @@ npm run build   # static site in ./out
 npm run lint
 ```
 
+A `next build` that dies with "SIGSEGV" is the CSS optimizer crashing on a CSS value: it
+happened on `calc(... + 3 * (clamp(...) + 12px) ...)` in globals.css; write such values out
+(`clamp(3rem, 4.05vw, 3.9rem) + 66px`). To find one, build an older commit in a worktree and
+swap files in.
+
 Don't run `npm run build` while `npm run dev` is running: both write to `.next`, and the
 dev server then returns "Internal Server Error". Stop dev first, or if it happens, stop it,
 `rm -rf .next`, and start it again.
