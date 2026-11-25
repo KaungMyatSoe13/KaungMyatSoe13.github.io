@@ -2,12 +2,16 @@
 
 import Link from "next/link";
 import { useEffect, useLayoutEffect, useRef, useState } from "react";
-import { aboutIntro, afterHours, contact, experience, skills, type HobbyShape, type SkillIcon } from "@/content/about";
-import ContactTv, { type TvScreen } from "./ContactTv";
+import { aboutIntro, contact, experience, skills, type SkillIcon } from "@/content/about";
+import StackCarousel from "./StackCarousel";
+import Credits from "./Credits";
 import { site } from "@/content/site";
 import KLogo from "./KLogo";
 import TvLink from "./TvLink";
 import { tvOn } from "@/lib/tv";
+import { loading } from "@/lib/loading";
+import { aboutTv } from "@/lib/aboutTv";
+import AboutTv from "./AboutTv";
 
 /*
  * About page (inspired by inacionakiti.com, not a copy):
@@ -19,6 +23,8 @@ import { tvOn } from "@/lib/tv";
  * Both are plain WebGL2 points.
  */
 
+/** Share of the portrait's particles kept for the icons on the "What I do" TV (its screen is small). */
+const ICON_KEEP = 0.4;
 const ease = (t: number) => (t < 0.5 ? 4 * t * t * t : 1 - Math.pow(-2 * t + 2, 3) / 2);
 
 function gl2(canvas: HTMLCanvasElement) {
@@ -100,29 +106,29 @@ function rectOf(canvas: HTMLCanvasElement): [number, number, number, number] {
 /* ---------- 1. Portrait in particles ---------- */
 const PORTRAIT_VS = `#version 300 es
 in vec2 a_home; in float a_l; in vec3 a_seed;
-in vec2 d0; in vec2 d1; in vec2 d2; in vec2 d3; in vec2 d4; in vec2 d5; in vec2 yr; in vec2 yr2; in vec3 o0; in vec3 o1; in vec3 o2; in vec3 o3; in vec2 fm;
-uniform float w[11];  // 0 portrait, 1..6 "what I do" icons, 7 first year, 8 last year, 9 the hobby object, 10 the contact form
+in vec2 d0; in vec2 d1; in vec2 d2; in vec2 d3; in vec2 d4; in vec2 d5; in vec2 yr; in vec2 yr2; in vec2 fm;
+uniform float w[11];  // 0 portrait, 1..6 "what I do" icons, 7 first year, 8 last year, 9 unused, 10 the contact form
 uniform float u_keep;            // share of particles shown (fewer on the way to the year)
-uniform mat3 u_rot[4]; uniform float u_ow[4];  // hobby objects (ball, pad, record, chip): turn, mix
-uniform float u_vs; uniform vec2 u_vc;            // their size and centre
 uniform float u_fmy;                              // the form scrolls with the page
+uniform float u_y2y;                              // so does the last year, once it lets go
 uniform float u_glitch;                           // slices jump while the form takes over
 uniform float u_loose, u_fade;
 uniform float u_t, u_gather, u_aspect, u_size, u_reveal, u_rad;
 uniform vec2 u_mouse;
 uniform sampler2D u_smear;
+uniform vec2 u_q[4];  // the "What I do" TV's screen: top-left, top-right, bottom-right, bottom-left
+uniform float u_face; // 1 while that screen faces you, 0 turned away (icons never show through its back)
 out float v_l; out float v_a;
 ${CRT}
+// d0..d5 are spots on the TV screen's picture (0..1, y down): find them on the screen as it turns
+vec2 onScreen(vec2 uv){ return mix(mix(u_q[0], u_q[1], uv.x), mix(u_q[3], u_q[2], uv.x), uv.y); }
 void main(){
+  float onTv = w[1] + w[2] + w[3] + w[4] + w[5] + w[6];
   // where this particle belongs right now: the photo, or a diagram, as you scroll
-  // the hobby object: each 3D shape turned its own way, mixed by channel, in perspective
-  vec3 ob = (u_rot[0] * o0) * u_ow[0] + (u_rot[1] * o1) * u_ow[1] + (u_rot[2] * o2) * u_ow[2] + (u_rot[3] * o3) * u_ow[3];
-  vec2 rec = u_vc + ob.xy * u_vs * 3.0 / (3.0 - ob.z);
-  float face = smoothstep(-0.7, 0.5, ob.z);                     // the far side reads dimmer
-  vec2 home = a_home * w[0] + d0 * w[1] + d1 * w[2] + d2 * w[3] + d3 * w[4] + d4 * w[5] + d5 * w[6] + yr * w[7] + yr2 * w[8] + rec * w[9] + (fm + vec2(0.0, u_fmy)) * w[10];
+  vec2 home = a_home * w[0] + onScreen(d0) * w[1] + onScreen(d1) * w[2] + onScreen(d2) * w[3] + onScreen(d3) * w[4] + onScreen(d4) * w[5] + onScreen(d5) * w[6] + yr * w[7] + (yr2 + vec2(0.0, u_y2y)) * w[8] + (fm + vec2(0.0, u_fmy)) * w[10];
   // swirl loose on the way between two shapes
   float sw = a_seed.x * 6.2831 + u_t * 0.5;
-  home += vec2(cos(sw), sin(sw)) * u_loose * (0.06 + a_seed.y * 0.22);
+  home += vec2(cos(sw), sin(sw)) * u_loose * (0.06 + a_seed.y * 0.22) * (1.0 - 0.7 * onTv);  // tighter inside the TV
   vec2 away = (a_seed.xy * 2.0 - 1.0) * vec2(u_aspect, 1.0) * 1.3;
   float a = clamp(u_gather * 1.6 - a_seed.z * 0.6, 0.0, 1.0);
   float e = a < 0.5 ? 4.0 * a * a * a : 1.0 - pow(-2.0 * a + 2.0, 3.0) / 2.0;
@@ -140,13 +146,14 @@ void main(){
   p += normalize(d + 1e-5) * 0.025 * k * u_reveal;
   // glitch: horizontal slices jump sideways
   p.x += (hsh(vec2(floor(p.y * 28.0), floor(u_t * 30.0))) - 0.5) * 0.16 * u_glitch * step(0.55, hsh(vec2(floor(p.y * 28.0), floor(u_t * 30.0) + 3.0)));
-  vec2 q = crt(vec2(p.x / u_aspect, p.y), u_t);
+  // on the TV the icons follow its screen exactly (the 3D TV isn't bent by the page's curve)
+  vec2 q = mix(crt(vec2(p.x / u_aspect, p.y), u_t), vec2(p.x / u_aspect, p.y), onTv);
   gl_Position = vec4(q, 0.0, 1.0);
   gl_PointSize = u_size;
-  v_l = mix(mix(0.88, a_l, w[0]), 0.55 + 0.45 * face, w[9]);      // diagrams are evenly lit
+  v_l = mix(0.88, a_l, w[0]);      // diagrams are evenly lit
   v_a = smoothstep(0.0, 0.3, a) * (1.0 - 0.95 * k * u_reveal) * u_fade;
   v_a *= 1.0 - smoothstep(u_keep - 0.03, u_keep, a_seed.z);  // thin out smoothly
-  v_a *= mix(1.0, 0.3 + 0.7 * face, w[9]);
+  v_a *= mix(1.0, u_face, onTv);
 }`;
 
 // the real photo, shown only inside a soft circle around the pointer
@@ -167,7 +174,8 @@ void main(){
   vec4 c = texture(u_img, v_uv);
   float l = dot(c.rgb, vec3(0.299, 0.587, 0.114));
   float m = 1.0 - smoothstep(u_rad * 0.55, u_rad * 1.05, length(v_p - u_mouse));
-  o = vec4(vec3(pow(l, 0.85) * 1.15), c.a * m * u_reveal);
+  vec3 col = vec3(pow(l, 0.85) * 1.15);
+  o = vec4(col, c.a * m * u_reveal);
 }`;
 
 
@@ -273,8 +281,9 @@ function drawIcon(g: CanvasRenderingContext2D, icon: SkillIcon) {
   void W; void H;
 }
 
-/** Particle targets for one step: its icon drawn offscreen, sampled, placed on the right. */
-function iconPoints(icon: SkillIcon, N: number, aspect: number) {
+/** Particle targets for one step: its icon drawn offscreen and sampled, as spots on the
+ *  "What I do" TV's screen picture (0..1, y down; the shader finds them on the screen). */
+function iconPoints(icon: SkillIcon, N: number) {
   const W = 1000, H = 720;
   const c = document.createElement("canvas"); c.width = W; c.height = H;
   const g = c.getContext("2d", { willReadFrequently: true })!;
@@ -282,16 +291,14 @@ function iconPoints(icon: SkillIcon, N: number, aspect: number) {
   const d = g.getImageData(0, 0, W, H).data;
   const on: number[] = [];
   for (let k = 0; k < W * H; k++) if (d[k * 4 + 3] > 128) on.push(k);
-  // right half on wide screens, lower middle on phones; units: x in ±aspect, y in ±1
-  const wide = aspect > 1;
-  const bw = wide ? Math.min(aspect * 0.8, 1.9) : aspect * 1.8, bh = bw * (H / W);
-  const cx = wide ? aspect * 0.53 : 0, cy = wide ? 0.04 : -0.35;   // clear of the text on the left
+  // inside the curved tube, below the channel number
+  const x0 = 0.14, x1 = 0.86, y0 = 0.2, y1 = 0.88;
   const out = new Float32Array(N * 2);
   for (let i = 0; i < N; i++) {
     const k = on[Math.floor(Math.random() * on.length)] ?? 0;
     const px = (k % W) + Math.random(), py = Math.floor(k / W) + Math.random();
-    out[i * 2] = cx + (px / W - 0.5) * bw;
-    out[i * 2 + 1] = cy - (py / H - 0.5) * bh;
+    out[i * 2] = x0 + (px / W) * (x1 - x0);
+    out[i * 2 + 1] = y0 + (py / H) * (y1 - y0);
   }
   return out;
 }
@@ -378,9 +385,10 @@ function Portrait({ src }: { src: string }) {
     let raf = 0, alive = true, cleanup = () => {};
     const img = new Image();
     img.src = src;
+    loading.track("about:photo", img.decode(), 1);
     img.decode().then(() => {
       if (!alive) return;
-      const P = program(gl, PORTRAIT_VS, DOT_FS, ["a_home", "a_l", "a_seed", "d0", "d1", "d2", "d3", "d4", "d5", "yr", "yr2", "o0", "o1", "o2", "o3", "fm"]);
+      const P = program(gl, PORTRAIT_VS, DOT_FS, ["a_home", "a_l", "a_seed", "d0", "d1", "d2", "d3", "d4", "d5", "yr", "yr2", "fm"]);
       const Q = program(gl, PHOTO_VS, PHOTO_FS, ["a_pos"]);
       // Sample the cut-out (transparent background): dense where it's lit, thinner in the
       // dark clothes, with the brightness stretched so the figure reads as lit.
@@ -428,11 +436,9 @@ function Portrait({ src }: { src: string }) {
       const dBufs = skills.map((_, i) => buffer(gl, 3 + i, new Float32Array(N * 2), 2));
       const yrBuf = buffer(gl, 9, new Float32Array(N * 2), 2);
       const yr2Buf = buffer(gl, 10, new Float32Array(N * 2), 2);
-      afterHours.hobbies.forEach((h, k) => buffer(gl, 11 + k, shapePoints(h.shape, N), 3));
-      const ow = [1, 0, 0, 0];
       // the contact form drawn as particles: title, labels, field lines and the button, at the
       // spot they sit once the section reaches the top of the screen (scroll = formY)
-      const fmBuf = buffer(gl, 15, new Float32Array(N * 2), 2);
+      const fmBuf = buffer(gl, 11, new Float32Array(N * 2), 2);
       let formY = 1e9, formLive = false, switchT = -1e9;
       const buildForm = () => {
         const form = document.querySelector<HTMLElement>(".ab__form"), sec = form?.closest<HTMLElement>(".ab__contact");
@@ -473,7 +479,6 @@ function Portrait({ src }: { src: string }) {
         gl.bindBuffer(gl.ARRAY_BUFFER, fmBuf);
         gl.bufferData(gl.ARRAY_BUFFER, out, gl.STATIC_DRAW);
       };
-      let ang = 0;
       let unstickY = 1e9;
       // the first year, at the spot the year canvas will sit once it is stuck in place
       let stickY = 1e9;
@@ -506,10 +511,9 @@ function Portrait({ src }: { src: string }) {
         gl.bufferData(gl.ARRAY_BUFFER, toScreen(experience[experience.length - 1].year), gl.STATIC_DRAW);
       };
       const buildDiagrams = () => {
-        const asp = canvas.clientWidth / Math.max(1, canvas.clientHeight);
         skills.forEach((sk, i) => {
           gl.bindBuffer(gl.ARRAY_BUFFER, dBufs[i]);
-          gl.bufferData(gl.ARRAY_BUFFER, iconPoints(sk.icon, N, asp), gl.STATIC_DRAW);
+          gl.bufferData(gl.ARRAY_BUFFER, iconPoints(sk.icon, N), gl.STATIC_DRAW);
         });
       };
       (document.fonts?.ready ?? Promise.resolve()).then(() => { buildDiagrams(); buildYear(); buildForm(); });
@@ -526,7 +530,7 @@ function Portrait({ src }: { src: string }) {
       let dpr = 1;
       const fit = () => { dpr = Math.min(devicePixelRatio || 1, 2); canvas.width = Math.round(canvas.clientWidth * dpr); canvas.height = Math.round(canvas.clientHeight * dpr); };
       fit();
-      const onResize = () => { fit(); buildDiagrams(); buildYear(); buildForm(); };
+      const onResize = () => { fit(); buildYear(); buildForm(); };
       addEventListener("resize", onResize);
       const m = { x: 9, y: 9, sx: 9, sy: 9, on: false };
       const wts = new Float32Array(11);
@@ -563,19 +567,25 @@ function Portrait({ src }: { src: string }) {
         if (i0 + 1 < K) wts[2 + i0] += enter * fr;
         // after Maintain the same particles travel to the first year and become it
         const endD = T2 + (K - 1) * vh;
-        const toYear = sm(endD + vh * 0.15, stickY - vh * 0.05, sy);
+        // the Tech stack section sits between: the particles fade out over it and only travel
+        // to the year once it is leaving (its logos are particles of their own)
+        const stk = document.querySelector<HTMLElement>(".ab__stack");
+        const sBot = stk ? stk.offsetTop + stk.offsetHeight : endD;
+        // (they come back only as the logo row is leaving the top of the screen)
+        const yearFrom = Math.min(Math.max(endD + vh * 0.15, sBot - vh * 0.45), stickY - vh * 0.35);
+        const toYear = sm(yearFrom, stickY - vh * 0.05, sy);
+        const stackHide = stk ? sm(endD + vh * 0.05, endD + vh * 0.4, sy) * (1 - sm(sBot - vh * 0.45, sBot - vh * 0.2, sy)) : 0;
         if (toYear > 0) { for (let q = 0; q < 7; q++) wts[q] *= 1 - toYear; wts[7] = toYear; }
         const loose = Math.max(Math.sin(Math.PI * enter), Math.sin(Math.PI * fr) * enter, Math.sin(Math.PI * toYear));
         // then hand over to the year canvas (it takes over the morphs between years)
         const hand = sm(stickY - vh * 0.06, stickY + vh * 0.04, sy);
-        // at the end of the timeline, take the last year back and turn it into the hobby object
-        const ah = document.querySelector<HTMLElement>(".ab__after");
-        const afterTop = ah ? ah.offsetTop : 1e9;
+        // at the end of the timeline, take the last year back; on into Contact it flies apart
+        // and draws the form, then the real form takes over
         const back = sm(unstickY - vh * 0.3, unstickY - vh * 0.12, sy);
-        const toRec = sm(unstickY - vh * 0.12, afterTop - vh * 0.05, sy);
-        if (back > 0) { wts.fill(0); wts[8] = 1 - toRec; wts[9] = toRec; }
-        // on into Contact: the object flies apart and draws the form, then the real form takes over
-        const toForm = sm(afterTop + vh * 0.1, formY - vh * 0.1, sy);
+        if (back > 0) { wts.fill(0); wts[8] = 1; }
+        // the last year first HOLDS its shape, scrolling up with the page like the real one,
+        // and only then flows to the form (going back up: form → particles → the year)
+        const toForm = sm(unstickY + vh * 0.2, Math.max(unstickY + vh * 0.3, formY - vh * 0.1), sy);
         if (toForm > 0) { for (let q = 0; q < 10; q++) wts[q] *= 1 - toForm; wts[10] = toForm; }
         // the swap is a glitch, not a fade: the real form glitches in while the particles
         // flicker out with slices jumping (and the reverse when you scroll back up)
@@ -589,17 +599,15 @@ function Portrait({ src }: { src: string }) {
         const ts = (now - switchT) / 1000, step = Math.floor(ts / 0.045);
         const flick = ts < 0.36 ? (formLive ? [1, 0.15, 1, 0, 0.7, 0.05, 0.4, 0][step] : [0, 0.6, 0, 1, 0.3, 1, 0.7, 1][step]) : formLive ? 0 : 1;
         const glitch = ts < 0.36 ? 1 : 0;
-        const fade = Math.max(1 - hand, back) * flick;
+        const fade = Math.max(1 - hand, back) * flick * (1 - stackHide);
         const yEl = document.querySelector<HTMLElement>(".ab__year");
         if (yEl) yEl.style.opacity = String(stickY < 1e8 ? hand * (1 - back) : 1);
-        // fewer particles on the way to the year (it reads best light), more again for the object
-        const yearShare = YEAR_N / N;
-        const keep = back > 0 ? yearShare + (0.6 - yearShare) * toRec : 1 + (yearShare - 1) * toYear;
-        // changing channel: the shapes cross-fade and the particles swirl loose on the way
-        const dtc = Math.min(0.1, (now - lastT) / 1000);
-        for (let k = 0; k < 4; k++) ow[k] += ((k === tv.ch ? 1 : 0) - ow[k]) * (1 - Math.exp(-dtc * 4.5));
-        const swap = 1 - Math.max(...ow);
-        const looseAll = Math.max(loose, Math.sin(Math.PI * toRec), Math.min(1, swap * 2.2), Math.sin(Math.PI * toForm));
+        // fewer particles on the way to the year (it reads best light), more again for the form
+        const yearShare = Math.min(1, YEAR_N / N);
+        // (and fewer inside the TV: its screen is small)
+        const base = 1 + (ICON_KEEP - 1) * enter;
+        const keep = back > 0 ? yearShare + (0.6 - yearShare) * toForm : base + (yearShare - base) * toYear;
+        const looseAll = Math.max(loose, Math.sin(Math.PI * toForm) * 0.55);   // a gentler swirl: it flows
         const over = m.on && enter < 0.05;
         reveal += ((over ? 1 : 0) - reveal) * 0.08;
         // over the figure the cursor ring becomes a big lens the size of the reveal circle
@@ -649,24 +657,30 @@ function Portrait({ src }: { src: string }) {
         gl.uniform1f(P.U("u_fade"), fade);
         gl.uniform1f(P.U("u_keep"), keep);
         gl.uniform1f(P.U("u_fmy"), ((sy - formY) * 2) / canvas.clientHeight);
+        gl.uniform1f(P.U("u_y2y"), (Math.max(0, sy - unstickY) * 2) / canvas.clientHeight);
         gl.uniform1f(P.U("u_glitch"), reduced ? 0 : glitch);
-        // each object turns its own way: the ball rolls, the pad, note and chip sway
-        const tt = reduced ? 0 : t;
-        ang = tt * 0.5;
-        const sway = Math.sin(tt * 0.6) * 0.5 + turn.x * 0.25;
-        const rots = [
-          mat3(rotX(-0.35 + turn.y * 0.1), rotY(ang)),
-          mat3(rotX(-0.3 + turn.y * 0.1), rotY(sway * 0.7)),
-          mat3(rotX(-0.2 + turn.y * 0.1), rotY(Math.sin(tt * 0.8) * 0.55 + turn.x * 0.25)),
-          mat3(rotX(-0.75 + turn.y * 0.1), rotZ(sway * 0.6)),
-        ];
-        gl.uniformMatrix3fv(P.U("u_rot"), false, new Float32Array(rots.flat()));
-        gl.uniform1fv(P.U("u_ow"), new Float32Array(ow));
-        gl.uniform1f(P.U("u_vs"), aspect > 1 ? 0.46 : aspect * 0.56);
-        // phones: in the gap between the channel number and the guide (46% down the screen)
-        gl.uniform2f(P.U("u_vc"), aspect > 1 ? aspect * 0.3 : 0, aspect > 1 ? 0.0 : 1 - (2 * (innerHeight * 0.46 - rect[1] * innerHeight)) / canvas.clientHeight);
+        // the TV's screen corners in this canvas's units (a plain box where the icons used to
+        // be until the TV has drawn, or without it)
+        const cw = canvas.clientWidth, ch = canvas.clientHeight, ca = cw / ch;
+        if (aboutTv.ready) {
+          const cr = canvas.getBoundingClientRect();
+          for (let c = 0; c < 4; c++) {
+            q8[c * 2] = (((aboutTv.px[c * 2] - cr.left) / cw) * 2 - 1) * ca;
+            q8[c * 2 + 1] = 1 - ((aboutTv.px[c * 2 + 1] - cr.top) / ch) * 2;
+          }
+        } else {
+          const wide = ca > 1, bw = wide ? Math.min(ca * 0.8, 1.9) : ca * 1.8, bh = bw * 0.72;
+          const cx = wide ? ca * 0.53 : 0, cy = wide ? 0.04 : -0.35;
+          q8.set([cx - bw / 2, cy + bh / 2, cx + bw / 2, cy + bh / 2, cx + bw / 2, cy - bh / 2, cx - bw / 2, cy - bh / 2]);
+        }
+        gl.uniform2fv(P.U("u_q"), q8);
+        // does the screen face you? (its corners run the other way round when it's turned away)
+        const ex = q8[2] - q8[0], ey = q8[3] - q8[1], fx = q8[6] - q8[0], fy = q8[7] - q8[1];
+        const cross = -(ex * fy - ey * fx) / Math.max(1e-6, Math.hypot(ex, ey) * Math.hypot(fx, fy));
+        gl.uniform1f(P.U("u_face"), sm(0.15, 0.5, cross));
         gl.drawArrays(gl.POINTS, 0, N);
       };
+      const q8 = new Float32Array(8);
       raf = requestAnimationFrame(frame);
       cleanup = () => { removeEventListener("resize", onResize); removeEventListener("pointermove", onMove); document.removeEventListener("pointerleave", onLeave); };
     }).catch(() => {});
@@ -761,7 +775,7 @@ function YearParticles({ year }: { year: string }) {
         from[i * 2] = from[i * 2] + (to[i * 2] - from[i * 2]) * e;
         from[i * 2 + 1] = from[i * 2 + 1] + (to[i * 2 + 1] - from[i * 2 + 1]) * e;
       }
-      to = textPoints(y, aspect);
+      to = textPoints(y, aspect, YEAR_N);
       if (!shown) { from = to.slice(); upload(); k = 1; shown = y; return; } // delivered by the stage particles
       upload(); k = 0; shown = y;
     };
@@ -812,150 +826,6 @@ function YearParticles({ year }: { year: string }) {
 
 
 
-/* 3D shapes for the hobby channels, as (x, y, z) about radius 1. */
-const rotX = (a: number) => [1, 0, 0, 0, Math.cos(a), Math.sin(a), 0, -Math.sin(a), Math.cos(a)];
-const rotY = (a: number) => [Math.cos(a), 0, -Math.sin(a), 0, 1, 0, Math.sin(a), 0, Math.cos(a)];
-const rotZ = (a: number) => [Math.cos(a), Math.sin(a), 0, -Math.sin(a), Math.cos(a), 0, 0, 0, 1];
-/** a × b for column-major 3×3 matrices (b is applied first). */
-function mat3(a: number[], b: number[]) {
-  const o = new Array(9).fill(0);
-  for (let c = 0; c < 3; c++) for (let r = 0; r < 3; r++) for (let k = 0; k < 3; k++) o[c * 3 + r] += a[k * 3 + r] * b[c * 3 + k];
-  return o;
-}
-
-/** A football: dense pentagon patches on a sparser sphere. */
-function ballPoints(N: number) {
-  const f = (1 + Math.sqrt(5)) / 2, v: number[][] = [];
-  for (const s1 of [-1, 1]) for (const s2 of [-1, 1]) v.push([0, s1, s2 * f], [s1, s2 * f, 0], [s2 * f, 0, s1]);
-  const vn = v.map((p) => { const l = Math.hypot(p[0], p[1], p[2]); return p.map((c) => c / l); });
-  const out = new Float32Array(N * 3);
-  for (let i = 0; i < N; ) {
-    const g = [0, 0, 0].map(() => { let u = 0; for (let k = 0; k < 6; k++) u += Math.random(); return u - 3; });
-    const l = Math.hypot(g[0], g[1], g[2]) || 1, p = g.map((c) => c / l);
-    const near = Math.max(...vn.map((q) => q[0] * p[0] + q[1] * p[1] + q[2] * p[2]));
-    const ang = Math.acos(Math.min(1, near));
-    // pentagons filled, the seams around them drawn, the hexagons light
-    const keep = ang < 0.3 ? 1 : Math.abs(ang - 0.345) < 0.025 ? 0.55 : 0.05;
-    if (Math.random() > keep) continue;
-    out.set(p.map((c) => c * 0.95), i * 3); i++;
-  }
-  return out;
-}
-
-/** A flat drawing (400×280, white on clear) given depth, as 3D points. */
-function extrude(N: number, draw: (g: CanvasRenderingContext2D) => void) {
-  const W = 400, H = 280, c = document.createElement("canvas"); c.width = W; c.height = H;
-  const g = c.getContext("2d", { willReadFrequently: true })!;
-  g.fillStyle = "#fff";
-  draw(g);
-  const d = g.getImageData(0, 0, W, H).data, inside: number[] = [], edge: number[] = [];
-  const on = (x: number, y: number) => x >= 0 && y >= 0 && x < W && y < H && d[(y * W + x) * 4 + 3] > 128;
-  for (let y = 0; y < H; y++) for (let x = 0; x < W; x++) {
-    if (!on(x, y)) continue;
-    inside.push(x, y);
-    if (!on(x + 1, y) || !on(x - 1, y) || !on(x, y + 1) || !on(x, y - 1)) edge.push(x, y);
-  }
-  const out = new Float32Array(N * 3), D = 0.12;
-  for (let i = 0; i < N; i++) {
-    const q = Math.random();
-    const src = q < 0.5 ? inside : edge;
-    const k = Math.floor(Math.random() * (src.length / 2)) * 2;
-    const x = (src[k] + Math.random() - 200) / 165, y = -(src[k + 1] + Math.random() - 135) / 165;
-    // front face; the outline and any holes drawn on the front too, so they read
-    const z = q < 0.42 ? D : q < 0.5 ? -D : q < 0.85 ? D : (Math.random() * 2 - 1) * D;
-    out.set([x, y, z], i * 3);
-  }
-  return out;
-}
-
-/** Two beamed notes (♫). */
-const notePoints = (N: number) => extrude(N, (g) => {
-  g.beginPath(); g.ellipse(128, 222, 46, 33, -0.45, 0, Math.PI * 2); g.fill();
-  g.beginPath(); g.ellipse(292, 196, 46, 33, -0.45, 0, Math.PI * 2); g.fill();
-  g.fillRect(156, 52, 17, 168); g.fillRect(320, 26, 17, 168);                     // stems
-  g.beginPath(); g.moveTo(156, 52); g.lineTo(337, 22); g.lineTo(337, 64); g.lineTo(156, 94); g.closePath(); g.fill(); // beam
-});
-
-/** A game controller: a drawn silhouette (buttons cut out), given depth. */
-const padPoints = (N: number) => extrude(N, (g) => {
-  g.beginPath(); g.roundRect(60, 50, 280, 112, 54); g.fill();
-  g.beginPath(); g.ellipse(108, 158, 46, 88, -0.38, 0, Math.PI * 2); g.fill();
-  g.beginPath(); g.ellipse(292, 158, 46, 88, 0.38, 0, Math.PI * 2); g.fill();
-  g.globalCompositeOperation = "destination-out";
-  g.fillRect(92, 98, 50, 15); g.fillRect(110, 80, 15, 51);                       // d-pad
-  [[288, 82], [288, 128], [265, 105], [311, 105]].forEach(([x, y]) => { g.beginPath(); g.arc(x, y, 10, 0, Math.PI * 2); g.fill(); });
-  [[163, 150], [237, 150]].forEach(([x, y]) => { g.beginPath(); g.arc(x, y, 25, 0, Math.PI * 2); g.fill(); });
-  g.fillRect(180, 86, 14, 7); g.fillRect(206, 86, 14, 7);                          // select / start
-  g.globalCompositeOperation = "source-over";
-  [[163, 150], [237, 150]].forEach(([x, y]) => { g.beginPath(); g.arc(x, y, 15, 0, Math.PI * 2); g.fill(); }); // sticks
-});
-
-/** Code: a chunky "</>" with a few code lines under it. */
-const codePoints = (N: number) => extrude(N, (g) => {
-  g.lineCap = "round"; g.lineJoin = "round"; g.strokeStyle = "#fff"; g.lineWidth = 30;
-  g.beginPath(); g.moveTo(140, 50); g.lineTo(60, 120); g.lineTo(140, 190); g.stroke();      // <
-  g.beginPath(); g.moveTo(260, 50); g.lineTo(340, 120); g.lineTo(260, 190); g.stroke();     // >
-  g.beginPath(); g.moveTo(222, 32); g.lineTo(178, 208); g.stroke();                         // /
-  g.lineWidth = 14;
-  [[70, 248, 190], [210, 248, 250], [270, 248, 330]].forEach(([x1, y, x2]) => { g.beginPath(); g.moveTo(x1, y); g.lineTo(x2, y); g.stroke(); });
-});
-
-function shapePoints(shape: HobbyShape, N: number) {
-  return shape === "ball" ? ballPoints(N) : shape === "pad" ? padPoints(N) : shape === "note" ? notePoints(N) : codePoints(N);
-}
-/** The channel on the TV, shared with the particle stage. */
-const tv = { ch: 0 };
-
-/** (04) After hours: an old TV's channel guide, one channel per hobby. */
-function AfterHours() {
-  const H = afterHours.hobbies;
-  const [ch, setCh] = useState(0);
-  const [seen, setSeen] = useState(false);
-  const [tick, setTick] = useState(0);              // restarts the timer after a click
-  const ref = useRef<HTMLElement>(null);
-  useEffect(() => { tv.ch = ch; }, [ch]);
-  useEffect(() => {
-    const io = new IntersectionObserver(([e]) => setSeen(e.intersectionRatio > 0.6), { threshold: [0, 0.6, 1] });
-    io.observe(ref.current!);
-    return () => io.disconnect();
-  }, []);
-  useEffect(() => {
-    if (!seen || matchMedia("(prefers-reduced-motion: reduce)").matches) return;
-    const id = window.setTimeout(() => setCh((c) => (c + 1) % H.length), CH_MS);
-    return () => window.clearTimeout(id);
-  }, [seen, ch, tick, H.length]);
-  const pick = (i: number) => { setCh(i); setTick((t) => t + 1); };
-  const no = (i: number) => String(i + 1).padStart(2, "0");
-  return (
-    <section ref={ref} className="ab__after" aria-labelledby="ab-after">
-      <div className="ab__do-head">
-        <p className="ab__label"><span>(04)</span> Off the clock</p>
-        <p className="ab__do-note">{afterHours.note}</p>
-      </div>
-      <div className="ab__tv">
-        <ol className="ab__guide" aria-label="Channels">
-          {H.map((h, i) => (
-            <li key={h.name}>
-              <button type="button" aria-current={i === ch} onClick={() => pick(i)}>
-                <span>CH {no(i)}</span><b>{h.name}</b>
-              </button>
-            </li>
-          ))}
-        </ol>
-        <div className="ab__osd">
-          <p className="ab__osd-play" aria-hidden="true">▶ PLAY</p>
-          <p key={ch} className="ab__osd-ch gx-text" aria-hidden="true">CH {no(ch)}</p>
-          <h2 id="ab-after" className="ab__osd-name">{afterHours.title}</h2>
-        </div>
-      </div>
-      <div className="ab__tv-foot">
-        <p key={ch} className="ab__tv-line gx-text" aria-live="polite">{H[ch].line}</p>
-        <div className="ab__seg" data-run={seen} aria-hidden="true"><i key={`${ch}-${tick}`} style={{ animationDuration: `${CH_MS}ms` }} /></div>
-      </div>
-    </section>
-  );
-}
-const CH_MS = 5200;
 /** Radius of the photo reveal around the pointer (clip units of the stage's height). */
 const REVEAL_R = 0.3;
 
@@ -964,9 +834,10 @@ function AltName({ names }: { names: string[] }) {
   const [i, setI] = useState(0);
   useEffect(() => {
     if (matchMedia("(prefers-reduced-motion: reduce)").matches) return;
-    const id = window.setInterval(() => setI((v) => (v + 1) % names.length), 3600);
-    return () => window.clearInterval(id);
-  }, [names.length]);
+    // the real name holds (5 s), the alias only flashes by (2 s)
+    const id = window.setTimeout(() => setI((v) => (v + 1) % names.length), i === 0 ? 5000 : 2000);
+    return () => window.clearTimeout(id);
+  }, [i, names.length]);
   return <span key={i} className="ab__name gx-text" aria-hidden="true">{names[i]}</span>;
 }
 
@@ -1038,7 +909,7 @@ function CrtBackground() {
 
 /** (05) Contact: a form beside an old TV that shows what you type. */
 function Contact() {
-  const screen = useRef<TvScreen>({ name: "", msg: "", state: "idle" });
+  const screen = { current: aboutTv.screen };
   const [sent, setSent] = useState(false);
   const onInput = (e: React.FormEvent<HTMLFormElement>) => {
     const f = new FormData(e.currentTarget);
@@ -1054,11 +925,10 @@ function Contact() {
     const href = `mailto:${site.email}?subject=${encodeURIComponent(`Hello from ${name}`)}&body=${encodeURIComponent(`${msg}\n\n${name}\n${from}`)}`;
     window.setTimeout(() => { window.location.href = href; screen.current.state = "sent"; setSent(true); }, 1100);
   };
-  const c = contact.credit;
   return (
-    <section className="ab__contact" aria-labelledby="ab-contact">
+    <section id="contact" className="ab__contact" aria-labelledby="ab-contact">
       <div className="ab__do-head">
-        <p className="ab__label"><span>(05)</span> Contact</p>
+        <p className="ab__label"><span>(04)</span> Contact</p>
         <p className="ab__do-note">{contact.note}</p>
       </div>
       <div className="ab__contact-grid">
@@ -1073,13 +943,16 @@ function Contact() {
             <p aria-live="polite">{sent ? "Your mail app should be open. If not, " : "Or write to "}<a href={`mailto:${site.email}`}>{site.email}</a></p>
           </div>
         </form>
-        <div className="ab__contact-tv"><ContactTv screen={screen} turn={turn} /></div>
+        {/* the TV that fell from "What I do" lands here (AboutTv draws it; this is its spot and drag area) */}
+        <div className="ab__contact-tv">
+          <div className="ab__tv3d" role="img" aria-label="An old TV that shows your message as you type. Drag to tilt it." />
+        </div>
       </div>
-      <p className="ab__credit">
-        TV model: <a href={c.titleUrl} target="_blank" rel="noopener noreferrer">{c.title}</a> by{" "}
-        <a href={c.authorUrl} target="_blank" rel="noopener noreferrer">{c.author}</a>,{" "}
-        <a href="https://creativecommons.org/licenses/by/4.0/" target="_blank" rel="noopener noreferrer">CC BY 4.0</a>
-      </p>
+      {/* one line under it all: the credits dropdown and the TV's hint */}
+      <div className="ab__contact-foot">
+        <Credits />
+        <p className="ab__tv-hint" aria-hidden="true">↔ Drag to tilt</p>
+      </div>
     </section>
   );
 }
@@ -1087,7 +960,10 @@ function Contact() {
 export default function AboutStory() {
   const [active, setActive] = useState(0);
   const mainRef = useRef<HTMLElement>(null);
-  useLayoutEffect(() => { tvOn(mainRef.current, () => 0); }, []); // always open at the top
+  // open at the top, or at Contact for /about/#contact (the home menu's "Contact us")
+  useLayoutEffect(() => {
+    tvOn(mainRef.current, () => (location.hash === "#contact" ? (document.getElementById("contact")?.offsetTop ?? 0) : 0));
+  }, []);
   const listRef = useRef<HTMLOListElement>(null);
   // "What I do": which skill is on screen (follows the scroll, like the particles)
   const [skill, setSkill] = useState(0);
@@ -1140,6 +1016,7 @@ export default function AboutStory() {
         <TvLink className="link" href="/#work">Selected work →</TvLink>
       </header>
 
+      <AboutTv turn={turn} />
       <Portrait src={aboutIntro.photo} />
       <section className="ab__me" aria-labelledby="ab-me">
         <div className="ab__me-left gx-text">
@@ -1182,11 +1059,16 @@ export default function AboutStory() {
         </div>
       </section>
 
+      {/* the tools: just a row of particle logos, looping (their own canvas) */}
+      <section className="ab__stack" aria-label="Tech stack">
+        <StackCarousel />
+      </section>
+
       <section className="ab__exp" aria-labelledby="ab-exp">
         <div className="ab__exp-head">
           <p className="ab__label"><span>(03)</span> Experience</p>
           <h2 id="ab-exp" className="ab__lead">
-            Since <b>{experience[0].year}</b> I&apos;ve been studying, building and shipping: web apps, mobile apps and machine learning.
+            Since <b>{experience[0].year}</b>: four levels cleared. Still leveling up.
           </h2>
         </div>
         <div className="ab__exp-grid">
@@ -1210,7 +1092,6 @@ export default function AboutStory() {
         </div>
       </section>
 
-      <AfterHours />
       <Contact />
     </main>
   );

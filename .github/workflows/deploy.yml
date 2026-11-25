@@ -25,6 +25,10 @@ jobs:
           cache: npm
       - run: npm ci
       - run: npm run build
+        env:
+          # the "Ask K" assistant (worker/); repo Settings → Secrets and variables → Actions → Variables
+          NEXT_PUBLIC_CHAT_URL: ${{ vars.NEXT_PUBLIC_CHAT_URL }}
+          NEXT_PUBLIC_TURNSTILE_SITEKEY: ${{ vars.NEXT_PUBLIC_TURNSTILE_SITEKEY }}
       - run: touch out/.nojekyll
       - uses: actions/upload-pages-artifact@v3
         with:

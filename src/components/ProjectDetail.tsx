@@ -10,6 +10,7 @@ import { particlesReady } from "@/lib/scatter";
 import { BEND, CARD_AR, CARD_KEY, GRID, cardGrid, gridAt } from "@/lib/cardGrid";
 import KLogo from "./KLogo";
 import { homeShot } from "@/lib/snapshot";
+import { bytes, loading } from "@/lib/loading";
 
 /*
  * Project page, after fojcikdominik.com's project view. One WebGL scene:
@@ -47,6 +48,7 @@ const BG_FS = `#version 300 es
 precision highp float;
 in vec2 v_uv; out vec4 o;
 uniform sampler2D u_img; uniform float u_has, u_room, u_aspect, u_imgAspect, u_grow;
+uniform float u_mono;   // 1: the photo in black and white; less for a 3D place (kept in colour)
 uniform vec2 u_turn;
 void main(){
   vec2 uv = v_uv;
@@ -58,7 +60,7 @@ void main(){
     if (u_imgAspect > u_aspect) f.x *= u_aspect / u_imgAspect; else f.y *= u_imgAspect / u_aspect;
     vec3 img = texture(u_img, vec2(f.x + 0.5, 0.5 - f.y)).rgb;
     float l = dot(img, vec3(0.299, 0.587, 0.114));
-    col = vec3(smoothstep(0.02, 0.85, l));
+    col = mix(img, vec3(smoothstep(0.02, 0.85, l)), u_mono);
   } else {
     // a dark room: lit walls at the sides, a pale floor, a dark ceiling
     vec2 p = c * vec2(u_aspect, 1.0);
@@ -78,14 +80,29 @@ const SCR_FS = `#version 300 es
 precision highp float;
 in vec2 v_uv; out vec4 o;
 uniform sampler2D u_img; uniform float u_alpha, u_flash, u_dim;
-uniform sampler2D u_card; uniform float u_cardMix;   // the home page's printed card, fading out
+uniform sampler2D u_card; uniform float u_cardMix;   // the arcade screen's picture, glitching out
+uniform float u_t;
+float h1(float n){ return fract(sin(n * 91.345) * 47453.5453); }
 void main(){
-  vec3 c = texture(u_img, v_uv).rgb;
-  c = mix(c, vec3(1.0), u_flash * 0.6) * u_dim;
-  // thin dark bezel
+  // the swap is a glitch, not a fade: the screen tears into slices that flip between the
+  // arcade picture and the project picture at their own moments, jump sideways, split colour
+  float m = u_cardMix;
+  float g = clamp(m * (1.0 - m) * 4.0, 0.0, 1.0);          // strongest half-way through
+  float tk = floor(u_t * 20.0);
+  float row = floor(v_uv.y * 22.0), fine = floor(v_uv.y * 90.0);
+  float card = step(h1(row * 1.3 + tk * 0.37 + 0.11), m);  // m 1 → all arcade, m 0 → all picture
+  float sh = (h1(fine + tk * 5.1) - 0.5) * 0.22 * g * step(0.5, h1(row + tk * 2.7));
+  vec2 uv = vec2(clamp(v_uv.x + sh, 0.0, 1.0), v_uv.y);
+  vec2 ca = vec2(0.014 * g, 0.0);
+  vec3 pic = vec3(texture(u_img, uv + ca).r, texture(u_img, uv).g, texture(u_img, uv - ca).b);
+  vec3 arc = vec3(texture(u_card, uv - ca).r, texture(u_card, uv).g, texture(u_card, uv + ca).b);
+  vec3 c = mix(mix(pic, vec3(1.0), u_flash * 0.6) * u_dim, arc, card);
+  // white static on a few thin lines while it tears
+  float st = step(0.86, h1(fine * 0.7 + tk * 1.9)) * g;
+  c = mix(c, vec3(h1(floor(v_uv.x * 160.0) + fine * 3.1 + tk)), st * 0.7);
+  // thin dark bezel (the arcade picture has its own)
   float b = step(0.006, v_uv.x) * step(v_uv.x, 0.994) * step(0.01, v_uv.y) * step(v_uv.y, 0.99);
-  vec3 scr = mix(vec3(0.03), c, b);
-  o = vec4(mix(scr, texture(u_card, v_uv).rgb, u_cardMix), u_alpha);
+  o = vec4(mix(vec3(0.03), c, max(b, card)), u_alpha);
 }`;
 
 // the curved-TV lens and VHS finish over everything
@@ -172,6 +189,9 @@ function program(gl: WebGL2RenderingContext, vs: string, fs: string, attrs: stri
   return { p, loc };
 }
 
+/** Gallery entries can be videos: they play while they are the picture in front. */
+const isVideo = (src: string) => /\.(mp4|webm|mov)$/i.test(src);
+
 export default function ProjectDetail({ index }: { index: number }) {
   const p = projects[index];
   const shots = [p.cover, ...(p.gallery ?? [])];
@@ -181,6 +201,12 @@ export default function ProjectDetail({ index }: { index: number }) {
   const selRef = useRef(0);
   const targetRef = useRef(0);                        // slider target (unbounded index)
   const goRef = useRef<((k: number) => void) | null>(null); // slide to picture k
+  // the viewer: a picture (or video) shown whole, uncropped, over everything
+  const [view, setView] = useState<number | null>(null);
+  const viewRef = useRef<number | null>(null);
+  viewRef.current = view;
+  const openViewRef = useRef<(k: number) => void>(() => {});
+  openViewRef.current = (k: number) => setView(k);
   const closeRef = useRef<(() => void) | null>(null);
   const rootRef = useRef<HTMLElement>(null);
   const canvasRef = useRef<HTMLCanvasElement>(null);
@@ -265,7 +291,32 @@ export default function ProjectDetail({ index }: { index: number }) {
       drawScreenFace(c.getContext("2d")!, p, index, projects.length, { prompt: true });
       cardTex = tex2d(c);
     }).catch(() => {});
+    // videos: a <video> per entry, drawn into its screen's picture every frame while it shows
+    const vids: ({ el: HTMLVideoElement; c: HTMLCanvasElement; g: CanvasRenderingContext2D } | null)[] = shots.map(() => null);
+    const drawCrop = (x: CanvasRenderingContext2D, src: CanvasImageSource, w: number, h: number) => {
+      const s = Math.max(TW / w, TH / h);
+      x.fillStyle = "#fff"; x.fillRect(0, 0, TW, TH);
+      x.drawImage(src, (TW - w * s) / 2, 0, w * s, h * s);
+    };
     shots.forEach((src, i) => {
+      if (isVideo(src)) {
+        const el = document.createElement("video");
+        el.src = src; el.muted = true; el.loop = true; el.playsInline = true; el.preload = "auto";
+        el.addEventListener("loadeddata", () => {
+          const c = document.createElement("canvas"); c.width = TW; c.height = TH;
+          const g = c.getContext("2d")!;
+          drawCrop(g, el, el.videoWidth, el.videoHeight);
+          const t = gl.createTexture()!;
+          gl.bindTexture(gl.TEXTURE_2D, t);
+          gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, gl.RGBA, gl.UNSIGNED_BYTE, c);
+          gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.LINEAR);
+          gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE);
+          gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE);
+          vids[i] = { el, c, g }; texs[i] = t;
+          if (i === selRef.current) void el.play().catch(() => {});
+        }, { once: true });
+        return;
+      }
       const img = new Image(); img.src = src;
       img.decode().then(() => {
         const c = document.createElement("canvas"); c.width = TW; c.height = TH;
@@ -280,6 +331,63 @@ export default function ProjectDetail({ index }: { index: number }) {
     if (p.scene) {
       const img = new Image(); img.src = p.scene;
       img.decode().then(() => { bgTex = tex2d(img); bgAspect = img.naturalWidth / img.naturalHeight; }).catch(() => {});
+    }
+    // A 3D place behind (scene3d): three.js draws it on its own canvas every frame and that
+    // canvas becomes the room's picture; the pointer turns the camera inside it.
+    let place: { canvas: HTMLCanvasElement; tex: WebGLTexture; draw: (yaw: number, pitch: number, t: number) => void } | null = null;
+    let placeStop = () => {}, placeDead = false;
+    if (p.scene3d) {
+      const ld = loading.add(`project:${p.slug}:scene`, 4);   // the first-load counter waits for it
+      const s3 = p.scene3d;
+      void (async () => {
+        const THREE = await import("three");
+        const { GLTFLoader } = await import("three/examples/jsm/loaders/GLTFLoader.js");
+        const gltf = await new GLTFLoader().loadAsync(s3.src, bytes(ld)).finally(() => ld(1));
+        if (placeDead) return;
+        const c3 = document.createElement("canvas");
+        const r3 = new THREE.WebGLRenderer({ canvas: c3, antialias: false, preserveDrawingBuffer: true });
+        r3.outputColorSpace = THREE.SRGBColorSpace;
+        r3.toneMapping = THREE.ACESFilmicToneMapping;
+        r3.toneMappingExposure = s3.exposure ?? 1.35;
+        const sc3 = new THREE.Scene();
+        sc3.background = new THREE.Color(0x05060c);
+        if ((s3.fog ?? 0.035) > 0) sc3.fog = new THREE.FogExp2(0x05060c, s3.fog ?? 0.035);
+        sc3.add(new THREE.HemisphereLight(0xb8c4ff, 0x2a2030, 1.6));
+        sc3.add(gltf.scene);
+        if (s3.env) {
+          // shiny / metal materials need something to reflect
+          const { RoomEnvironment } = await import("three/examples/jsm/environments/RoomEnvironment.js");
+          const pm = new THREE.PMREMGenerator(r3);
+          sc3.environment = pm.fromScene(new RoomEnvironment(), 0.04).texture;
+          sc3.environmentIntensity = s3.env;
+          pm.dispose();
+        }
+        const cam = new THREE.PerspectiveCamera(s3.fov ?? 55, 16 / 9, 0.05, 200);
+        const eye = new THREE.Vector3(...s3.eye), look = new THREE.Vector3(...s3.look);
+        const sway = eye.distanceTo(look) * 0.006;           // in the model's own units
+        cam.near = sway * 0.5; cam.far = eye.distanceTo(look) * 20; cam.updateProjectionMatrix();
+        const t3 = gl.createTexture()!;
+        gl.bindTexture(gl.TEXTURE_2D, t3);
+        gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.LINEAR);
+        gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE);
+        gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE);
+        let size = "";
+        place = {
+          canvas: c3, tex: t3,
+          draw: (yaw, pitch, t) => {
+            // half resolution: it sits behind the screens, under the lens and VHS
+            const w = Math.max(2, Math.round(canvas.width * 0.5)), h = Math.max(2, Math.round(canvas.height * 0.5));
+            if (size !== `${w}x${h}`) { size = `${w}x${h}`; r3.setSize(w, h, false); cam.aspect = w / h; cam.updateProjectionMatrix(); }
+            // standing in the street, swaying a little; the pointer turns the head
+            cam.position.set(eye.x + Math.sin(t * 0.21) * sway, eye.y + Math.sin(t * 0.37) * sway * 0.4, eye.z);
+            cam.lookAt(look);
+            cam.rotateY(-yaw * 3.2);
+            cam.rotateX(pitch * 3.2);
+            r3.render(sc3, cam);
+          },
+        };
+        placeStop = () => { r3.dispose(); gl.deleteTexture(t3); };
+      })().catch((e) => console.warn("[scene3d]", e));
     }
 
     // offscreen target for the lens pass
@@ -424,6 +532,7 @@ export default function ProjectDetail({ index }: { index: number }) {
         const x = e.clientX / window.innerWidth;
         if (n > 1 && x < 0.3) targetRef.current = Math.round(targetRef.current) - 1;
         else if (n > 1 && x > 0.7) targetRef.current = Math.round(targetRef.current) + 1;
+        else openViewRef.current(selRef.current);           // the one in front: see it whole
         return;
       }
       // flick: carry on a little in the throw direction, then settle on a picture
@@ -475,7 +584,11 @@ export default function ProjectDetail({ index }: { index: number }) {
       if (Math.abs(targetRef.current - slide) < 0.0005 && Math.abs(slideV) < 0.0005) { slide = targetRef.current; slideV = 0; }
       const speed = Math.min(1, Math.abs(slideV) * 12);
       const sNow = ((Math.round(slide) % n) + n) % n;
-      if (sNow !== lastSel) { lastSel = sNow; selRef.current = sNow; setSel(sNow); }
+      if (sNow !== lastSel) {
+        lastSel = sNow; selRef.current = sNow; setSel(sNow);
+        // the video in front plays; the others wait (from the start next time)
+        vids.forEach((v, i) => { if (!v) return; if (i === sNow) void v.el.play().catch(() => {}); else { v.el.pause(); v.el.currentTime = 0; } });
+      }
 
       // 1. scene into the offscreen target
       gl.bindFramebuffer(gl.FRAMEBUFFER, fbo);
@@ -484,14 +597,20 @@ export default function ProjectDetail({ index }: { index: number }) {
       gl.useProgram(BG.p);
       gl.bindVertexArray(quadVao);
       gl.activeTexture(gl.TEXTURE0);
-      gl.bindTexture(gl.TEXTURE_2D, bgTex);
+      if (place) {
+        place.draw(yaw, pitch, now / 1000);
+        gl.bindTexture(gl.TEXTURE_2D, place.tex);
+        gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, gl.RGBA, gl.UNSIGNED_BYTE, place.canvas);
+      } else gl.bindTexture(gl.TEXTURE_2D, bgTex);
       gl.uniform1i(BG.loc("u_img"), 0);
-      gl.uniform1f(BG.loc("u_has"), bgTex ? 1 : 0);
+      gl.uniform1f(BG.loc("u_has"), place || bgTex ? 1 : 0);
+      gl.uniform1f(BG.loc("u_mono"), place ? 0.2 : 1);
       gl.uniform1f(BG.loc("u_room"), room);
       gl.uniform1f(BG.loc("u_grow"), grow);
       gl.uniform1f(BG.loc("u_aspect"), aspect);
-      gl.uniform1f(BG.loc("u_imgAspect"), bgAspect);
-      gl.uniform2f(BG.loc("u_turn"), yaw / TURN_X, pitch / TURN_Y);
+      gl.uniform1f(BG.loc("u_imgAspect"), place ? place.canvas.width / place.canvas.height : bgAspect);
+      // a 3D place turns its own camera; a photo slides instead
+      gl.uniform2f(BG.loc("u_turn"), place ? 0 : yaw / TURN_X, place ? 0 : pitch / TURN_Y);
       gl.drawArrays(gl.TRIANGLES, 0, 3);
 
       gl.enable(gl.BLEND);
@@ -504,8 +623,15 @@ export default function ProjectDetail({ index }: { index: number }) {
       const ks = n > 1 ? [base - 2, base + 2, base - 1, base + 1, base] : [base];
       ks.sort((A, B) => Math.abs(B - slide) - Math.abs(A - slide));
       for (const kk of ks) {
-        const tex = texs[((kk % n) + n) % n];
+        const ki = ((kk % n) + n) % n, tex = texs[ki];
         if (!tex) continue;
+        // a playing video: this frame into its screen's picture
+        const v = vids[ki];
+        if (v && !v.el.paused && v.el.readyState >= 2) {
+          drawCrop(v.g, v.el, v.el.videoWidth, v.el.videoHeight);
+          gl.bindTexture(gl.TEXTURE_2D, tex);
+          gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, gl.RGBA, gl.UNSIGNED_BYTE, v.c);
+        }
         const d = kk - slide;                       // -1 left slot, 0 middle, 1 right slot
         const ad = Math.min(Math.abs(d), 1.6);
         const k = Math.abs(d) < 0.5 ? 0 : Math.sign(d);
@@ -533,9 +659,10 @@ export default function ProjectDetail({ index }: { index: number }) {
         }
         gl.bindBuffer(gl.ARRAY_BUFFER, posBuf);
         gl.bufferSubData(gl.ARRAY_BUFFER, 0, pos);
-        // the travelling screen starts as the home page's printed card and fades into the
-        // picture as it moves to its slot (and back again on the way home)
-        const cardMix = kk === base && k === 0 && cardTex && (start || dir < 0) ? 1 - smooth(0.2, 0.65, T) : 0;
+        // the travelling screen starts as the arcade's screen and glitches into the picture
+        // as it moves to its slot (and back again on the way home)
+        const cardMix = kk === base && k === 0 && cardTex && (start || dir < 0) ? 1 - smooth(0.26, 0.52, T) : 0;
+        gl.uniform1f(SCR.loc("u_t"), (now - t0) / 1000);
         gl.activeTexture(gl.TEXTURE1); gl.bindTexture(gl.TEXTURE_2D, cardTex ?? tex);
         gl.uniform1i(SCR.loc("u_card"), 1);
         gl.uniform1f(SCR.loc("u_cardMix"), cardMix);
@@ -582,6 +709,8 @@ export default function ProjectDetail({ index }: { index: number }) {
     raf = requestAnimationFrame(frame);
     return () => {
       cancelAnimationFrame(raf);
+      vids.forEach((v) => { if (v) { v.el.pause(); v.el.removeAttribute("src"); v.el.load(); } });
+      placeDead = true; placeStop();
       window.removeEventListener("resize", fit);
       window.removeEventListener("pointermove", onMove);
       canvas.removeEventListener("pointerdown", onDown);
@@ -596,6 +725,12 @@ export default function ProjectDetail({ index }: { index: number }) {
   // arrow keys switch screens, Escape closes
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
+      if (viewRef.current !== null) {
+        if (e.key === "Escape") setView(null);
+        if (e.key === "ArrowRight") { const k = (viewRef.current + 1) % n; setView(k); goRef.current?.(k); }
+        if (e.key === "ArrowLeft") { const k = (viewRef.current - 1 + n) % n; setView(k); goRef.current?.(k); }
+        return;
+      }
       if (e.key === "ArrowRight") targetRef.current = Math.round(targetRef.current) + 1;
       if (e.key === "ArrowLeft") targetRef.current = Math.round(targetRef.current) - 1;
       if (e.key === "Escape") closeRef.current?.();
@@ -619,14 +754,19 @@ export default function ProjectDetail({ index }: { index: number }) {
       <div className="sc sc--ghost" data-labels="on" aria-hidden="true">
         <header className="sc__top sc__fade">
           <span className="brand"><KLogo />{site.name}</span>
-          <span className="link">Contact</span>
         </header>
         <div className="sc__list">
-          <p className="sc__title sc__fade">Selected work</p>
-          <p className="sc__credit sc__fade">Models: Arcade machine Street Fighter by bvbwork510524, DS game card by maney, CC BY 4.0</p>
+          <div className="sc__menu sc__fade">
+            <p className="sc__title">Menu</p>
+            <ul className="sc__menu-list">
+              <li><span className="sc__menu-link">About</span></li>
+              <li><span className="sc__menu-link">Contact us</span></li>
+              <li><span className="sc__menu-link">Resume ↗</span></li>
+            </ul>
+          </div>
         </div>
         <p className="sc__summary sc__fade">
-          <span>{p.type} · {p.year} · click to open · scroll to change</span>
+          <span>Click to open · scroll to change</span>
         </p>
       </div>
 
@@ -657,23 +797,42 @@ export default function ProjectDetail({ index }: { index: number }) {
           )}
         </div>
         <div>
-          <h2 className="pd__label">Role</h2>
-          <ul className="pd__text">
-            {(p.role ?? []).map((r) => <li key={r}>{r}</li>)}
-            <li className="pd__stack">{p.stack.join(" / ")}</li>
+          <h2 className="pd__label">Built with</h2>
+          <ul className="pd__text pd__built">
+            {p.stack.map((t) => <li key={t}>{t}</li>)}
           </ul>
         </div>
         <ol className="pd__thumbs" aria-label="Pictures">
           {shots.map((s, k) => (
             <li key={s}>
-              <button type="button" aria-current={k === sel} onClick={() => goRef.current?.(k)} aria-label={`Picture ${k + 1}`}>
-                {/* eslint-disable-next-line @next/next/no-img-element */}
-                <img src={s} alt="" />
+              <button type="button" aria-current={k === sel} onClick={() => goRef.current?.(k)} aria-label={`${isVideo(s) ? "Video" : "Picture"} ${k + 1}`}>
+                {isVideo(s)
+                  ? <video src={s} muted playsInline preload="metadata" />
+                  // eslint-disable-next-line @next/next/no-img-element
+                  : <img src={s} alt="" />}
               </button>
             </li>
           ))}
         </ol>
       </section>
+
+      {/* the viewer: the picture whole (the screens crop it to their curved shape) */}
+      {view !== null && (
+        <div className="pd__viewer" role="dialog" aria-modal="true" aria-label={`${p.name}, ${view + 1} of ${n}`} onClick={() => setView(null)}>
+          {isVideo(shots[view])
+            ? <video key={shots[view]} src={shots[view]} autoPlay loop muted playsInline controls onClick={(e) => e.stopPropagation()} />
+            // eslint-disable-next-line @next/next/no-img-element
+            : <img key={shots[view]} src={shots[view]} alt={`${p.name}, picture ${view + 1}`} onClick={(e) => e.stopPropagation()} />}
+          {n > 1 && (
+            <>
+              <button type="button" className="pd__viewer-prev" aria-label="Previous" onClick={(e) => { e.stopPropagation(); const k = (view - 1 + n) % n; setView(k); goRef.current?.(k); }}>‹</button>
+              <button type="button" className="pd__viewer-next" aria-label="Next" onClick={(e) => { e.stopPropagation(); const k = (view + 1) % n; setView(k); goRef.current?.(k); }}>›</button>
+            </>
+          )}
+          <p className="pd__viewer-count">{no(view)} / {no(n - 1)}</p>
+          <button type="button" className="pd__viewer-close" onClick={() => setView(null)}>&gt; Close &lt;</button>
+        </div>
+      )}
     </main>
   );
 }

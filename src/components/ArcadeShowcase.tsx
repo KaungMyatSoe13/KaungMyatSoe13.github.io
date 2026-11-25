@@ -8,10 +8,16 @@ import { RETURN_KEY } from "./ProjectDetail";
 import { BEND, CARD_KEY, GRID, lensInv } from "@/lib/cardGrid";
 import { homeShot, homeShotMouse, setHomeShot } from "@/lib/snapshot";
 import { drawKFace, drawScreenFace } from "@/lib/screenFace";
-import { floodOrigin } from "@/lib/stage";
-import { LABEL, TEX, drawCardLabel } from "@/lib/cardLabel";
+import { floodOrigin, snap } from "@/lib/stage";
+import { LABEL, TEX, drawCardLabel, projectCard } from "@/lib/cardLabel";
+import { arcadeGames } from "@/content/arcadeGames";
+import { drawGameArt } from "@/lib/gameArt";
+import { music } from "@/lib/music";
+import { bytes, loading } from "@/lib/loading";
+import { ABOUT_FILES, prefetch } from "@/lib/prefetch";
 import KLogo from "./KLogo";
 import TvLink from "./TvLink";
+import { glitchJump } from "@/lib/tv";
 
 /*
  * Home page project section (second screen, under the ink K).
@@ -43,10 +49,11 @@ const POST_FS = `
 in vec2 vUv;
 layout(location = 0) out vec4 fragColor;
 uniform sampler2D tScene, tText;
-uniform vec3 uPaper;
+uniform vec3 uPaper, uTextCol, uEdgeCol;   // the paper, the faint drifting text, the edge wash
 uniform float uT, uAspect, uClean, uBend, uDrift, uKick, uOver;
 uniform sampler2D tCards;          // the game cards: drawn flat over the bent scene
 uniform sampler2D tInk; uniform float uInk;   // the home page's ink, behind the arcade
+uniform sampler2D tBack;           // cards with 90s arcade games floating behind everything
 float hash(vec2 p){ return fract(sin(dot(p, vec2(127.1, 311.7))) * 43758.5453); }
 float noise(vec2 p){ vec2 i = floor(p), f = fract(p); vec2 u = f * f * (3.0 - 2.0 * f);
   return mix(mix(hash(i), hash(i + vec2(1, 0)), u.x), mix(hash(i + vec2(0, 1)), hash(i + vec2(1, 1)), u.x), u.y); }
@@ -76,7 +83,9 @@ void main(){
   // paper with faint drifting text, then the scene (premultiplied, linear) over it
   vec2 tuv = vec2(s.x * 0.22 + 0.5, s.y * 0.22 + 0.5 - uDrift);   // canvas textures are flipped
   float txt = texture(tText, tuv, 1.6).r;
-  vec3 bg = lin(mix(uPaper, vec3(0.62), txt * ${BG_TEXT.toFixed(2)}));
+  vec3 bg = lin(mix(uPaper, uTextCol, txt * ${BG_TEXT.toFixed(2)}));
+  vec4 kbk = texture(tBack, cuv);
+  bg = bg * (1.0 - kbk.a) + kbk.rgb * 0.9;           // a little faded into the paper
   // the ink floods the page behind the arcade (it has its own TV curve already)
   vec4 ik = texture(tInk, vUv);
   float ia = ik.a * uInk;
@@ -94,7 +103,7 @@ void main(){
   float lum = dot(col, vec3(0.299, 0.587, 0.114));
   col = mix(col, vec3(lum), 0.12) * 0.97 + 0.025;
   float edge = smoothstep(0.75, 1.7, length(q * vec2(0.62, 1.0)));
-  col = mix(col, vec3(1.0), edge * 0.5 * (1.0 - ia) * calm);
+  col = mix(col, uEdgeCol, edge * 0.5 * (1.0 - ia) * calm);
   col += (hash(vUv * vec2(1920.0, 1080.0) + uT) - 0.5) * (0.05 + uKick * 0.08);
   col *= 1.0 - 0.035 * step(0.5, fract(vUv.y * 300.0));
   col += rb * 0.02;
@@ -315,6 +324,7 @@ export default function ArcadeShowcase() {
     if (d > n / 2) d -= n;
     if (d < -n / 2) d += n;
     targetRef.current = k + d;
+    if (d) music.tick();                                    // the wheel turns: a ratchet
   };
   const goToRef = useRef(goTo);
   goToRef.current = goTo;
@@ -322,6 +332,7 @@ export default function ArcadeShowcase() {
   const open = useCallback((i: number) => {
     const href = `/projects/${projects[i].slug}/`;
     if (exitRef.current) return;
+    music.openProject();                                   // "Round": the fight is on
     if (!glOk.current) { router.push(href); return; }
     exitRef.current = { row: i, t: performance.now() };
     goRef.current = () => router.push(href);
@@ -330,9 +341,18 @@ export default function ArcadeShowcase() {
   }, [router]);
   const activeRef = useRef(0);
   activeRef.current = active;
+  // resting on a project for a moment: fetch its 3D room in the background (opens faster)
+  useEffect(() => {
+    const t = window.setTimeout(() => prefetch(projects[active].scene3d?.src), 700);
+    return () => window.clearTimeout(t);
+  }, [active]);
 
   useEffect(() => {
     const section = sectionRef.current!;
+    // the first-load counter waits for these (registered now, before anything async)
+    const ldArcade = loading.add("home:arcade", 4), ldCard = loading.add("home:card", 1);
+    const ldCovers = loading.add("home:covers", 1), ldFrame = loading.add("home:frame", 1);
+    let framed = false;
     const canvas = canvasRef.current!;
     let stop = () => {}, dead = false;
     const n = projects.length;
@@ -343,31 +363,32 @@ export default function ArcadeShowcase() {
     const wrap = (k: number) => ((k % n) + n) % n;
     const near = (i: number, c: number) => i + n * Math.round((c - i) / n);
     const atBottom = () => window.innerHeight + window.scrollY >= document.documentElement.scrollHeight - 2;
-    // One project per gesture. A trackpad keeps sending wheel events (momentum) for a second
-    // or more after a flick, so after a step the wheel stays locked until a new gesture.
-    const step = (d: number) => { targetRef.current = Math.round(targetRef.current) + d; };
-    // A new gesture: a pause (180 ms by the events' own timestamps), or, during a momentum
-    // tail, a clear new push: the tail has decayed (below 25% of its peak for 4 events in a
-    // row) and then the speed jumps to 3× its low point. A long, steady drag never decays like
-    // that, so it stays one step; a second flick on top of the momentum counts at once.
-    const STEP_GAP = 200;
-    let acc = 0, lastWheel = -1e9, locked = false, steppedAt = -1e9;
-    let peak = 0, low = Infinity, lowRun = 0, tail = false;
+    // One project per swipe. A trackpad keeps sending wheel events (momentum) for a second or
+    // more after a flick, so after a step the wheel locks until either the events pause
+    // (140 ms by their own timestamps) or a clearly NEW push arrives once the swipe has faded
+    // (below 40% of its peak since the step): an event over 2.5× the average of the last few.
+    // A swipe's own ramp-up and a momentum tail's small bumps never count (both moved two
+    // cards before). Steps are at least 300 ms apart; a short push (20 px) is enough.
+    const step = (d: number) => { targetRef.current = Math.round(targetRef.current) + d; music.tick(); };
+    const STEP_GAP = 300, PUSH = 20;
+    let acc = 0, lastWheel = -1e9, locked = false, steppedAt = -1e9, peak = 0;
+    const recent: number[] = [];
     const onWheel = (e: WheelEvent) => {
       const at = e.timeStamp, dy = e.deltaMode === 1 ? e.deltaY * 16 : e.deltaY, ady = Math.abs(dy);
-      const quiet = at - lastWheel > 180;
+      const quiet = at - lastWheel > 140;
       lastWheel = at;
-      if (!atBottom()) { locked = true; acc = 0; peak = ady; tail = false; lowRun = 0; low = Infinity; return; } // the page scroll's tail
+      if (quiet) recent.length = 0;                          // a new gesture: forget the old one
+      const avg = recent.length ? recent.reduce((s, v) => s + v, 0) / recent.length : 0;
+      recent.push(ady); if (recent.length > 4) recent.shift();
+      if (!atBottom()) { locked = true; acc = 0; return; }   // the page scroll's tail never steps
       e.preventDefault();
-      if (quiet) { locked = false; acc = 0; peak = 0; tail = false; lowRun = 0; low = Infinity; }
-      if (locked) {
-        peak = Math.max(peak, ady);
-        if (ady < peak * 0.25) { lowRun++; low = Math.min(low, ady); if (lowRun >= 4) tail = true; } else lowRun = 0;
-        if (tail && ady > Math.max(18, low * 3)) { locked = false; acc = 0; peak = ady; tail = false; lowRun = 0; low = Infinity; }
-      }
+      // (the peak before this event: a jump can't count against itself)
+      const fresh = locked && performance.now() - steppedAt > 250 && avg < peak * 0.4 && ady > 14 && ady > avg * 2.5;
+      if (locked) peak = Math.max(peak, ady);
+      if (quiet || fresh) { locked = false; acc = 0; }
       if (locked || performance.now() - steppedAt < STEP_GAP) return;
       acc += dy;
-      if (Math.abs(acc) > 30) { step(Math.sign(acc)); acc = 0; locked = true; steppedAt = performance.now(); peak = ady; }
+      if (Math.abs(acc) > PUSH) { step(Math.sign(acc)); acc = 0; locked = true; steppedAt = performance.now(); peak = ady; }
     };
     const dragState = { on: false };
     let touchY = 0, touchX = 0, touchDone = false;
@@ -402,7 +423,10 @@ export default function ArcadeShowcase() {
       }
     } catch {}
     let mx = tx, my = ty;
-    const onPointer = (e: PointerEvent) => { tx = (e.clientX / innerWidth) * 2 - 1; ty = -((e.clientY / innerHeight) * 2 - 1); };
+    let ptrOn = false;                                     // the pointer is over the page
+    const onPointer = (e: PointerEvent) => { tx = (e.clientX / innerWidth) * 2 - 1; ty = -((e.clientY / innerHeight) * 2 - 1); ptrOn = e.pointerType === "mouse" || e.pointerType === "pen"; };
+    const onLeave = () => { ptrOn = false; };
+    document.documentElement.addEventListener("pointerleave", onLeave);
     window.addEventListener("pointermove", onPointer, { passive: true });
 
     void (async () => {
@@ -412,7 +436,10 @@ export default function ArcadeShowcase() {
       renderer.autoClear = false;
       glOk.current = true;
       const loader = new GLTFLoader();
-      const [arcade, card] = await Promise.all([loader.loadAsync("/showcase/arcade.glb"), loader.loadAsync("/showcase/card.glb")]);
+      const [arcade, card] = await Promise.all([
+        loader.loadAsync("/showcase/arcade.glb", bytes(ldArcade)).then((g) => { ldArcade(1); return g; }),
+        loader.loadAsync("/showcase/card.glb", bytes(ldCard)).then((g) => { ldCard(1); return g; }),
+      ]);
       await (document.fonts?.ready ?? Promise.resolve());
       if (dead) { renderer.dispose(); return; }
 
@@ -549,7 +576,7 @@ export default function ArcadeShowcase() {
       const baseImg = prep.material.map?.image as CanvasImageSource | undefined;
       const cards = projects.map((p, i) => {
         const c = document.createElement("canvas"); c.width = TEX; c.height = TEX;
-        if (baseImg) drawCardLabel(c.getContext("2d")!, baseImg, p, i, prep.flipX, false);
+        if (baseImg) drawCardLabel(c.getContext("2d")!, baseImg, projectCard(p), i, prep.flipX, false);
         const t = new THREE.CanvasTexture(c);
         t.flipY = false; t.colorSpace = THREE.SRGBColorSpace; t.anisotropy = 8;
         const mat = prep.material.clone();
@@ -568,9 +595,58 @@ export default function ArcadeShowcase() {
         return mesh;
       });
 
+      // ---------- the background: game cards with 90s arcade games, floating behind it all ----------
+      // They drift up slowly and sway, and slip away from the pointer (a spring brings them back).
+      const bscene = new THREE.Scene();
+      bscene.add(new THREE.HemisphereLight(0xffffff, 0x50505a, 1.5));
+      const bk = new THREE.DirectionalLight(0xffffff, 2); bk.position.set(-2, 3, 5); bscene.add(bk);
+      const bcam = new THREE.PerspectiveCamera(30, 1, 0.1, 60);
+      const rand = (a: number, b: number) => a + Math.random() * (b - a);
+      // more cards than games (each game shows up two or three times), in mixed sizes:
+      // a few big ones, some small, most in between
+      const BG_N = 30, BG_TEX = 512;
+      const SIZES = [0.6, 0.8, 1, 1, 1.15, 1.5, 0.7, 1, 1.85, 0.9];
+      // the games' covers (a card without one gets painted art)
+      const covers = await Promise.all(arcadeGames.map(async (gm) => {
+        if (!gm.cover) return null;
+        const im = new Image(); im.src = gm.cover;
+        try { await im.decode(); return im; } catch { return null; }
+      }));
+      ldCovers(1);
+      // a cover fills the panel, cropped to fit (the flyers are taller than the panel)
+      const coverArt = (im: HTMLImageElement) => (g: CanvasRenderingContext2D, w: number, h: number) => {
+        const k = Math.max(w / im.naturalWidth, h / im.naturalHeight);
+        g.drawImage(im, (w - im.naturalWidth * k) / 2, (h - im.naturalHeight * k) * 0.3, im.naturalWidth * k, im.naturalHeight * k);
+      };
+      const floaters = Array.from({ length: BG_N }, (_, i) => {
+        const gm = arcadeGames[i % arcadeGames.length];
+        // small on screen: 512² labels (2048² × 30 was ~500 MB of GPU memory)
+        const c = document.createElement("canvas"); c.width = BG_TEX; c.height = BG_TEX;
+        if (baseImg) drawCardLabel(c.getContext("2d")!, baseImg, {
+          code: `ARC-${gm.year}-${String(i + 1).padStart(2, "0")}`, tag: gm.genre.toUpperCase(), big: gm.title, bigMax: 76,
+          art: covers[i % arcadeGames.length] ? coverArt(covers[i % arcadeGames.length]!) : (g, w, h) => drawGameArt(g, gm.genre, w, h, i),
+          artOnly: !!covers[i % arcadeGames.length],
+          small: "INSERT COIN", letter: gm.genre[0].toUpperCase(), year: gm.year, foot: "1P · 2P · PRESS START",
+        }, i + 2, prep.flipX, false, BG_TEX);
+        const t = new THREE.CanvasTexture(c);
+        t.flipY = false; t.colorSpace = THREE.SRGBColorSpace; t.anisotropy = 4;
+        const mat = prep.material.clone();
+        mat.map = t; mat.needsUpdate = true; mat.color.setScalar(0.9);
+        const mesh = new THREE.Mesh(prep.geo, mat);
+        bscene.add(mesh);
+        // spread out: one per slice across, at a random height and depth
+        return {
+          mesh, x: -1.15 + (2.3 * (i + Math.random() * 0.8)) / BG_N, y: rand(-1.3, 1.3), z: rand(0, 1),
+          vx: rand(-0.015, 0.015), vy: rand(0.02, 0.045), ph: rand(0, 6.28), sp: rand(0.25, 0.55),
+          rz: rand(-0.5, 0.5), wz: rand(-0.12, 0.12), ox: 0, oy: 0, pvx: 0, pvy: 0, kick: 0,
+          size: SIZES[(i * 7) % SIZES.length] * rand(0.92, 1.08),
+        };
+      });
+
       // ---------- post: the site's curved-TV finish over the paper ----------
       const rt = new THREE.WebGLRenderTarget(2, 2, { samples: 4, type: THREE.HalfFloatType });
       const rtC = new THREE.WebGLRenderTarget(2, 2, { samples: 4, type: THREE.HalfFloatType });
+      const rtB = new THREE.WebGLRenderTarget(2, 2, { samples: 4, type: THREE.HalfFloatType });
       const bc = document.createElement("canvas"); bc.width = 2048; bc.height = 1024;
       {
         const bx = bc.getContext("2d")!;
@@ -593,7 +669,7 @@ export default function ArcadeShowcase() {
       const post = new THREE.ShaderMaterial({
         glslVersion: THREE.GLSL3, vertexShader: POST_VS, fragmentShader: POST_FS, depthTest: false, depthWrite: false,
         uniforms: {
-          tScene: { value: rt.texture }, tCards: { value: rtC.texture }, tInk: { value: inkTex }, uInk: { value: 0 }, tText: { value: ttex }, uPaper: { value: new THREE.Vector3(0.949, 0.937, 0.914) },
+          tScene: { value: rt.texture }, tCards: { value: rtC.texture }, tBack: { value: rtB.texture }, tInk: { value: inkTex }, uInk: { value: 0 }, tText: { value: ttex }, uPaper: { value: new THREE.Vector3(0.949, 0.937, 0.914) }, uTextCol: { value: new THREE.Vector3(0.62, 0.62, 0.62) }, uEdgeCol: { value: new THREE.Vector3(1, 1, 1) },
           uT: { value: 0 }, uAspect: { value: 1 }, uClean: { value: 0 }, uBend: { value: BEND }, uDrift: { value: 0 }, uKick: { value: 0 }, uOver: { value: OVER },
         },
       });
@@ -615,10 +691,11 @@ export default function ArcadeShowcase() {
         const k = Math.min(dpr * OVER, 2.6);                      // the wider scene, at a sane size
         rt.setSize(Math.round(w * k), Math.round(h * k));
         rtC.setSize(Math.round(w * dpr), Math.round(h * dpr));
+        rtB.setSize(Math.round(w * dpr), Math.round(h * dpr));
         aspect = w / Math.max(1, h); phone = w <= 760;
-        camera.aspect = aspect; ccam.aspect = aspect;
+        camera.aspect = aspect; ccam.aspect = aspect; bcam.aspect = aspect;
         camera.zoom = 1 / OVER;
-        ccam.updateProjectionMatrix();
+        ccam.updateProjectionMatrix(); bcam.updateProjectionMatrix();
         post.uniforms.uAspect.value = aspect;
         poseAt(lastE, lastDv);
       };
@@ -770,7 +847,8 @@ export default function ArcadeShowcase() {
         // scroll progress over the first screen, eased by time so it glides
         const p = Math.min(1, Math.max(0, scrollY / innerHeight));
         if (ps < 0) ps = p;
-        ps = reduced ? p : ps + (p - ps) * (1 - Math.exp(-dt * 5));
+        ps = reduced || now < snap.until ? p : ps + (p - ps) * (1 - Math.exp(-dt * 5));
+        if (now < snap.until && p < 0.6) { lift.fill(1); fall.fill(-1); }   // a glitch jump: cards already up
         // the turn runs under the ink: it starts while the screen is still covered (0.3) and
         // settles just after the ink has drained (0.62), so you see it moving as it drains
         const tp = Math.min(1, Math.max(0, (ps - 0.3) / 0.42));
@@ -865,6 +943,7 @@ export default function ArcadeShowcase() {
               const st = ft - FALL_S;                                       // the slam: a short squash, then still
               off = st < 0.12 ? -0.05 * Math.sin((st / 0.12) * Math.PI) : 0;
               if (lift[i] > 0.5 && Math.abs(d) < 1.5) impactAt = now;
+              if (lift[i] > 0.5) music.thud();                              // each card lands with a thud
               lift[i] = 0;
             }
           }
@@ -896,6 +975,39 @@ export default function ArcadeShowcase() {
           fx.uTime.value = t;
         }
 
+        // the floating background cards: only on the landing (the showcase has its own cards);
+        // the swap happens under the ink, which covers the page from ps 0.35
+        const backOn = ps < 0.45;
+        bscene.visible = backOn;
+        const thb = Math.tan((bcam.fov / 2) * Math.PI / 180);
+        for (const f of backOn ? floaters : []) {
+          if (!reduced) { f.x += f.vx * dt; f.y += f.vy * dt; f.rz += f.wz * dt; }
+          // off the top: back in from the bottom, somewhere else across
+          if (f.y > 1.4) { f.y = -1.4; f.x = rand(-1.1, 1.1); }
+          if (f.x > 1.3) f.x = -1.3; else if (f.x < -1.3) f.x = 1.3;
+          // the pointer pushes them away, a spring brings them back (screen units, -1..1)
+          const dx = (f.x + f.ox - tx) * aspect, dy = f.y + f.oy - ty, dist = Math.hypot(dx, dy) + 1e-4;
+          const R = 0.3 + 0.12 * f.size;                            // big cards feel the pointer from further
+          if (ptrOn && dist < R && !reduced) {
+            const k = Math.pow(1 - dist / R, 2) * 14;
+            f.pvx += (dx / dist / aspect) * k * dt; f.pvy += (dy / dist) * k * dt;
+            f.kick += k * dt * (dx > 0 ? 1 : -1);                      // and it spins off a little
+          }
+          f.pvx -= f.ox * 2.5 * dt; f.pvy -= f.oy * 2.5 * dt;
+          const damp = Math.exp(-dt * 3.2);
+          f.pvx *= damp; f.pvy *= damp; f.kick *= Math.exp(-dt * 1.5);
+          f.ox += f.pvx * dt; f.oy += f.pvy * dt;
+          const D = CARD_D * (1 + f.z * 0.9), hhD = thb * D;
+          f.mesh.position.set((f.x + f.ox) * hhD * aspect, (f.y + f.oy) * hhD, -D);
+          f.mesh.scale.setScalar((phone ? 0.26 : 0.34) * f.size * thb * CARD_D);   // further ones look smaller
+          const tt = reduced ? 0 : t * f.sp;
+          f.mesh.rotation.set(Math.sin(tt + f.ph) * 0.45, Math.sin(tt * 0.8 + f.ph * 2) * 0.9 + f.kick, f.rz, "YXZ");
+        }
+
+        renderer.setRenderTarget(rtB);
+        renderer.setClearColor(0x000000, 0);
+        renderer.clear();
+        renderer.render(bscene, bcam);
         renderer.setRenderTarget(rt);
         renderer.setClearColor(0x000000, 0);
         renderer.clear();
@@ -915,6 +1027,7 @@ export default function ArcadeShowcase() {
         post.uniforms.uClean.value = Math.max(dvIn > 0 ? Math.min(1, dvIn * 3) : 0, dvOut);
         post.uniforms.uBend.value = bendNow;
         renderer.render(pscene, pcam);
+        if (!framed) { framed = true; ldFrame(1); }
 
         if (stillRef.current && stillRef.current.style.display === "block") stillRef.current.style.display = "none";
         if (ex && exT >= SHAKE_MS * 0.75 + DIVE_MS && goRef.current) {
@@ -931,9 +1044,9 @@ export default function ArcadeShowcase() {
         canvas.removeEventListener("click", onClick); canvas.removeEventListener("pointermove", onHover);
         canvas.removeEventListener("pointerdown", onDown); canvas.removeEventListener("pointermove", onDrag);
         canvas.removeEventListener("pointerup", onUp); canvas.removeEventListener("pointercancel", onUp);
-        renderer.dispose(); rt.dispose(); rtC.dispose();
+        renderer.dispose(); rt.dispose(); rtC.dispose(); rtB.dispose();
       };
-    })().catch((e) => console.warn("[showcase]", e));
+    })().catch((e) => { console.warn("[showcase]", e); [ldArcade, ldCard, ldCovers, ldFrame].forEach((f) => f(1)); });
 
     return () => {
       dead = true; stop();
@@ -942,6 +1055,7 @@ export default function ArcadeShowcase() {
       section.removeEventListener("touchmove", onTouchMove);
       window.removeEventListener("keydown", onKey);
       window.removeEventListener("pointermove", onPointer);
+      document.documentElement.removeEventListener("pointerleave", onLeave);
     };
   }, [open]);
 
@@ -956,17 +1070,30 @@ export default function ArcadeShowcase() {
       <canvas ref={canvasRef} className="sc__canvas" aria-label={`${p.name}: ${p.summary}`} role="img" />
 
       <header className="sc__top sc__fade">
-        <a className="brand" href="#top" aria-label={`${site.name}, back to top`}>
+        <a
+          className="brand"
+          href="#top"
+          aria-label={`${site.name}, back to top`}
+          onClick={(e) => {
+            // a glitch cut to the landing, not the whole scroll animation backwards
+            e.preventDefault();
+            glitchJump(() => window.scrollTo({ top: 0, behavior: "instant" as ScrollBehavior }));
+          }}
+        >
           <KLogo />
           {site.name}
         </a>
-        <span className="sc__nav">
-          <TvLink className="link" href="/about/">About</TvLink>
-          <a className="link" href={`mailto:${site.email}`}>Contact</a>
-        </span>
       </header>
-      <nav className="sc__list" aria-label="Projects">
-        <h2 id="work-title" className="sc__title sc__fade">Selected work</h2>
+      <nav className="sc__list" aria-label="Menu and projects">
+        {/* the menu, arcade style (the corner links were too faint) */}
+        <div className="sc__menu sc__fade">
+          <h2 id="work-title" className="sc__title">Menu</h2>
+          <ul className="sc__menu-list">
+            <li onPointerEnter={() => { music.blip(); prefetch(...ABOUT_FILES); }} onFocus={() => prefetch(...ABOUT_FILES)}><TvLink className="sc__menu-link" href="/about/">About</TvLink></li>
+            <li onPointerEnter={() => music.blip()}><TvLink className="sc__menu-link" href="/about/#contact">Contact us</TvLink></li>
+            <li onPointerEnter={() => music.blip()}><a className="sc__menu-link" href={site.resume} target="_blank" rel="noopener">Resume ↗</a></li>
+          </ul>
+        </div>
         <ol className="sr-only">
           {projects.map((x, i) => (
             <li key={x.slug}>
@@ -976,23 +1103,11 @@ export default function ArcadeShowcase() {
             </li>
           ))}
         </ol>
-        <p className="sc__credit sc__fade">{CREDIT}</p>
       </nav>
       <p className="sc__summary sc__fade" aria-live="polite">
-        <span>{p.type} · {p.year} · click to open · scroll to change</span>
+        <span>Click to open · scroll to change</span>
       </p>
     </section>
   );
 }
 
-/** Both models are CC BY 4.0: keep this line. */
-export const CREDIT = (
-  <>
-    Models:{" "}
-    <a href="https://sketchfab.com/3d-models/arcade-machine-street-fighter-092c7ef090e44b5d896c3960c1804ea9" target="_blank" rel="noopener noreferrer">Arcade machine Street Fighter</a> by{" "}
-    <a href="https://sketchfab.com/bvbwork510524" target="_blank" rel="noopener noreferrer">bvbwork510524</a>,{" "}
-    <a href="https://sketchfab.com/3d-models/ds-game-card-822e8ff1a12946048a8fa9dbadf3379d" target="_blank" rel="noopener noreferrer">DS game card</a> by{" "}
-    <a href="https://sketchfab.com/maney" target="_blank" rel="noopener noreferrer">maney</a>,{" "}
-    <a href="https://creativecommons.org/licenses/by/4.0/" target="_blank" rel="noopener noreferrer">CC BY 4.0</a>
-  </>
-);

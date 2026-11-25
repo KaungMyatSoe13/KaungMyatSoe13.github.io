@@ -1,3 +1,7 @@
+# CLAUDE.md
+
+This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
+
 # Portfolio — notes for Claude Code
 
 Personal portfolio for Kaung Myat Soe. Loads automatically into every Claude Code
@@ -23,6 +27,11 @@ crawls in from the side like a snake and settles into place.
 - Deploys on every push to `main` via `.github/workflows/deploy.yml` (GitHub Pages)
 
 ## Home page structure (current)
+
+How to read this file: the newest decisions come first in each section; "was tried / rejected"
+notes are history, not instructions. Big-picture map: `src/content/*` (data) → `src/app/*`
+(routes) → `src/components/*` (each big page is one WebGL-heavy component) → `src/lib/*`
+(shared canvas/geometry helpers, hand-off state in `scatter.ts`, `snapshot.ts`, `cardGrid.ts`).
 
 - `/` = `<InkHero arcade>` + `ArcadeShowcase` pinned under it. Arcade mode: no K (empty home
   mask, no fill intro, no SVG K), the ink layer is clear (`u_clear`: alpha = ink, no paper or
@@ -53,6 +62,19 @@ crawls in from the side like a snake and settles into place.
   outline hand-off, so the project room grows out of a full-view screen. Close: the project
   page ends on that same outline (no ghost of the home text any more) and the home page,
   seeing `back`, starts inside the screen and pulls back out (OUT_MS).
+- Showcase menu (owner's request; the corner About/Contact links were too faint): "MENU" in place
+  of "Selected work" (`.sc__menu`), items About, Contact us (`/about/#contact`: AboutStory's
+  `tvOn` scrolls to `#contact`), Resume ↗ (site.resume), arcade style (hovered item red with a
+  blinking ▶); phones: a row under the top bar. The project page's `.sc--ghost` copy matches.
+  Hovering a menu item plays `music.blip()` (a synthesized arcade cursor bip-bip; sound on only).
+  The hint under the menu is just "Click to open · scroll to change" on one line, on a paper chip
+  (it reaches over the cabinet).
+  Wheel: ONE card per swipe, but easy on a trackpad: a 20 px push steps; then locked until the
+  events pause 140 ms OR a clearly new push arrives (an event > 2.5× the last few's average,
+  only after the swipe has faded below 40% of its peak and ≥250 ms after the step; the recent
+  list resets on a pause). Steps ≥300 ms apart. Tested with simulated swipes: one long swipe =
+  1, a new swipe inside the old momentum = 1 more, a gentle push = 1. (Looser detectors moved
+  two cards: they counted a swipe's own ramp-up or the momentum's bumps as a new swipe.)
 - Showcase layout (owner's wireframe: arcade left, game cards on an arc
   right; no particles, no BMO). Arcade = "Arcade machine Street Fighter" by bvbwork510524
   (was "Final Fight Arcade" by brysew; Street Fighter art is Capcom's IP; the model's red
@@ -82,13 +104,70 @@ crawls in from the side like a snake and settles into place.
   name. Drag a card to turn it any way, all the way round (`spin`, with a throw); a drag is
   not a click; cards that leave the front turn back to face you.
   Click a card (non-active: it comes to the front; active: open) or the arcade → project
-  page; the hand-off outline is the arcade screen's (UV grid → project → `lensInv`), so the
+  page (on the project page the travelling screen swaps the arcade picture for the project
+  picture with a slice GLITCH, not a fade: `u_cardMix` in SCR_FS); the hand-off outline is the arcade screen's (UV grid → project → `lensInv`), so the
   room grows from behind it. Project page opening: first exactly the home screen's shape in
   perspective (`u_hinv` = inverse homography of the outline's 4 corners, `u_qs`; kept near
   the screen's box because perspective runs away), then a rounded box (`u_scale`, growing
-  as grow^2.4) takes over and always ends covering the whole view (`cover`). Unused, kept
-  for reference: `ComputerShowcase`, `BmoScreen`, `BendShowcase`, `cardFace` (+ their
-  assets in `public/showcase`).
+  as grow^2.4) takes over and always ends covering the whole view (`cover`). The old unused showcases (`ComputerShowcase`, `BmoScreen`, `BendShowcase`,
+  `cardFace`) and their assets (bmo.glb, computer.glb, card-mark/paper.webp) were deleted (they
+  were published though unused; BMO is Adventure Time's); they are in git history.
+- Landing background (landing only, ps < 0.45; the showcase has its own cards): 22 cards with
+  90s arcade games (`src/content/arcadeGames.ts`: titles, years, genres) float behind everything.
+  Covers: the real flyers/covers (owner's request; from each game's Wikipedia infobox, 400 wide
+  WebP in `public/landing/covers/`, `artOnly`: nothing printed over them); a game without one
+  falls back to our painted genre scene (`src/lib/gameArt.ts`, title printed logo-style) (`floaters`, own scene `bscene` + `rtB`,
+  composited in POST over the paper, under the ink and the arcade). They drift up and sway,
+  wrap round, and slip away from the mouse (spring back). Labels via `drawCardLabel` with a
+  `CardText` (`projectCard(p)` for the project cards; `bigMax` lets short titles print big).
+- Music (`src/lib/music.ts` + `Music.tsx` in the root layout, so it carries across client page
+  changes; Web Audio, gapless loops, crossfades; files in `public/audio/`, Street Fighter II
+  tracks). The site ALWAYS STARTS SILENT (owner's choice; nothing remembered). The "SOUND
+  ON/OFF" button (bottom centre, `.sound`) is the only way in: on → "Game Start" (the coin),
+  then the page's loop: home "Stage Select", about "Credits Roll", project pages "Continue";
+  off → stops. Opening a project (`music.openProject()`): music glitches out, "Round" plays,
+  "Continue" waits for it (`holdUntil`). Every track change plays a short synthesized glitch
+  (`glitchBuffer`, no file) and the old track slows like a tape stopping. Card wheel steps play
+  `music.tick()` (a synthesized ratchet) on top; each project card landing on the showcase plays
+  `music.thud()` (a synthesized low thud + click). (A "PRESS START" gate was tried and removed.)
+- First-load counter (`Loader.tsx` in the root layout, server-rendered so it covers the first
+  paint; `src/lib/loading.ts`): counts 1 → 100 from real progress, climbing from the bottom-right
+  corner to the top-right (`--k`), then glitches away (`loader-out`) with the page ready behind.
+  Pages register their heavy work at the START of their effect (before anything async, or the
+  counter can finish early): home = arcade.glb + card.glb (byte progress via `bytes()`), covers,
+  first frame; about = TV model + photo; project pages = their `scene3d`; plus fonts + window
+  load. Min 1.4 s, gives up at 20 s; scroll/keys are held meanwhile. Only the first load.
+- Performance: the floating cards' labels are 512² (`BG_TEX`; 2048² × 30 was ~500 MB of GPU
+  memory). Intent prefetch (`src/lib/prefetch.ts`, low priority, not on data-saver/slow): the
+  active project's `scene3d` after resting 0.7 s on its card; About's models on hovering
+  "About" in the menu. Each page still loads its own 3D on arrival.
+- K logo on the showcase: `glitchJump` (tv.ts) glitches out, jumps to the top, glitches in; the
+  scroll-eased canvases snap meanwhile (`snap.until` in stage.ts: InkHero `shown`, Arcade `ps`)
+  so nothing plays backwards.
+- "Ask K" AI assistant (AskK.tsx in the root layout; backend `worker/`, a Cloudflare Worker,
+  free tier; setup in README → "Ask K assistant"). Runs on Cloudflare Workers AI (free Llama 3.1
+  8B, `MODEL` in worker/src/index.ts; owner wants ZERO cost and no Claude/Anthropic account; the
+  free plan stops at its daily allowance, it never bills). It was first built on Claude Haiku via
+  the Anthropic API (separate pay-per-use billing, nothing to do with a Claude plan) and replaced.
+  Streamed as plain text; the profile (`worker/src/knowledge.md`, generated by `npm run knowledge`
+  from site.ts / about.ts / projects.ts / stack.ts + `src/content/assistant-facts.md`, TODO lines
+  skipped) is in the system prompt; a small model needs plain firm rules, keep them numbered and
+  short. Speaks as K's assistant, third person; "I don't know, email him" over guessing; a DO NOT
+  SHARE list (the owner's phone is deliberately NOT in any file). Spam ceiling: Workers rate limit
+  8/min/IP, KV daily cap (DAILY_CAP 400, ~12 neurons per message vs the 10,000/day free
+  allowance), Turnstile bot check → signed 30-min pass (`x-ask-k-pass`), CORS to the site only,
+  600 chars / 10 turns. Button bottom-left (phones: the corner), CRT window, chips,
+  sessionStorage only. Hidden unless `NEXT_PUBLIC_CHAT_URL` is set (GitHub Actions repo
+  variable). `worker/` is excluded from the site's tsconfig/eslint (it has its own).
+- `<html>`/`<body>` have `suppressHydrationWarning`: extensions like Grammarly add attributes.
+- Colours (owner removed the light/dark switch and its arcade button; they are in git history):
+  the HOME page (landing + showcase) is LIGHT paper; About, project pages, the loader and the
+  Ask K window are dark.
+  Landing cards: 30, mixed sizes (`SIZES` per card; bigger ones react to the pointer from further).
+- Smooth scrolling site-wide (`SmoothScroll.tsx` in the root layout): wheel → target, the
+  page eases to it (CATCH, WHEEL). Skips wheels a page already took (`defaultPrevented`: the
+  home card wheel), inner scroll boxes, pinch, sideways, touch, reduced motion; stops when
+  something else moves the page (keys, scrollbar, scrollTo).
 - `/lab` = the previous home (InkHero + staircase `ProjectList`), kept for reference.
 
 ## About page
@@ -112,7 +191,37 @@ crawls in from the side like a snake and settles into place.
   hovering the figure parts the particles and reveals the real photo in a soft circle;
   A particle Myanmar (big section, then a small note) was tried and removed.
   (02) What I do — `skills` in about.ts (Discover, Design, Architect, Build, Launch,
-  Maintain), each with an icon drawn in `drawIcon` (magnifier, browser wireframe, 3-tier
+  Maintain), each with an icon drawn in `drawIcon`. The page has ONE TV (`AboutTv.tsx`,
+  three.js on a fixed canvas behind the text; loader `src/lib/tvModel.ts`; shared state
+  `src/lib/aboutTv.ts`). It scrolls in with "What I do" and waits on the right (phones: lower
+  middle; smaller since the owner asked); no fade. It writes its screen's 4 projected corners
+  to `aboutTv.px` each frame and the particle shader maps the icon spots (screen uv,
+  `iconPoints`) onto them (`u_q`, `onScreen`; no page curve for them so they sit on the 3D
+  screen), so from (01) the photo's particles fly into the TV screen. Only ICON_KEEP of the
+  particles stay for the icons (small screen); they fade when the screen turns away (`u_face`,
+  from the corners' winding) so they never show through the TV's back. After Maintain the TV
+  tips over and falls WITH the scroll the whole way to Contact (owner: not drop first and
+  wait): tumbling (scroll + a time-based `tumble`), swinging side to side right of the
+  timeline line, darker (lights down, never see-through), behind the Experience years; over
+  the last ~0.85 screen before `landAt` it falls into `.ab__contact-tv`, then squashes,
+  bounces and rattles, and the section jolts (`.ab__contact[data-thud]`). Poses blend with
+  quaternion slerp (shortest way), so scrolling back up never unwinds extra turns.
+  While it falls it glitches into other models (`SHELLS` / `SWAP_AT` in AboutTv, loaded by
+  `loadShell` in tvModel.ts ~1.2 s after start): main TV → "Television" (defiat11, `scale` 1.3) →
+  "Old TV - Vintage Style" (Elliot_Lisenkov; faces -x, `rotY` π/2) → "TV Retro White" (Lukas
+  Bobor; its FRONT is -z, `rotY` π: the dark bulge with vents on +z is the tube's back; `scale`
+  1.45: its antennas made the fit small; its glass is rounded, so the picture follows the glass's
+  own outline, `outline` rows measured once with `measureGlass` in tvModel.ts: dev only, ~5 s). One-mesh models give their glass as a box
+  [left, top, right, bottom] seen from the front (measured with a ray depth grid); check a new
+  model from all four sides before trusting +z. (An "Old Retro Television" and a PS1 were tried
+  and replaced.), all Sketchfab CC BY 4.0,
+  credited in `contact.credits` (keep them). The last one lands in Contact, then BACK_S later
+  glitches back into the main TV. The swap glitch (GLITCH_S) is a colour glitch: R/G/B drawn
+  apart with raw `colorMask` passes + torn scissored bands + a random CSS hue-rotate, the two
+  models flickering. Their screens: a grid laid over the glass by raycasting from the front
+  (named mesh `skrin`, or the measured box), showing the same canvas (`tex2`).
+  While falling the screen switches at random between SMPTE colour bars (`drawBars`, vertical
+  hold slips) and "NO SIGNAL" static; the bars also show during each swap glitch. Icons: (magnifier, browser wireframe, 3-tier
   system, code editor, rocket rising out of an open box, gear with a check mark).
   After Maintain the stage particles travel into the first experience year (`yr`, w[7]),
   placed where the sticky year canvas will stick (`stickY`), then cross-fade to that canvas.
@@ -126,7 +235,25 @@ crawls in from the side like a snake and settles into place.
   Liquid pointer (`makeSmear`): a 128² half-float displacement field per WebGL context;
   the pointer drags into it, it fades (0.955/frame) and blurs, and the portrait/icons and
   the experience years sample it in the vertex shader, so particles move and drift back.
-  (03) Experience — sticky big year in particles on the left that swirls and re-forms
+  Copy emphasis (owner): modern frameworks first (React, Next.js, TypeScript, Node), WordPress /
+  Elementor / Shopify second; don't dwell on the current job in the intro. The name line holds
+  "Kaung Myat Soe," (no "I'm", owner) 5 s and flashes "Aka K," 2 s.
+  Tech stack — just the logo ROW, no label/title/text (owner); `.ab__stack` (StackCarousel.tsx, own WebGL2 canvas, NOT the portrait's
+  particles): 23 logos from Simple Icons (CC0; `src/content/stack.ts`, the 24×24 path `d`; the
+  `main` ones first and yellow: React, Next.js, TypeScript, Node.js; WordPress & co. after), dense
+  particles (step 1.25, LOGO 116); the NAMES are sharp text on a 2D canvas on top (`.ab__stack-names`,
+  same wrap maths) because particle text was unreadable. Sampled into fixed
+  particles on a row that loops sideways (SLOT/SPEED), slows under the pointer, can be dragged;
+  they gather when the strip comes into view and nudge away from the pointer. Scrollable: a
+  sideways trackpad swipe (or Shift + wheel) runs the row; vertical wheels still scroll the page. The portrait
+  particles fade out over this section (`stackHide`) and fly to the year only as it leaves
+  (`toYear` starts at its bottom); the falling TV shrinks/dims up into the top-right over it.
+  Copy in `stackIntro` (about.ts).
+  (03) Experience — headline short and fun ("Since 2023: four levels cleared. Still leveling
+  up."); career, not projects (owner): 2023 diploma (SIM), 2025 degree (UOW),
+  2025 freelance (10 months), 2026 web developer at a Singapore marketing agency (WordPress,
+  Elementor, Shopify, custom plugins; now). Copy is friendly/energetic (owner is 22).
+  Sticky big year in particles on the left that swirls and re-forms
   when the timeline entry nearest the screen middle changes year; timeline on the right.
   A fixed `CrtBackground` canvas draws a curved TV grid (same curve as the landing). All
   canvases share a `crt()` shader (curve + the landing's exact glitch: `GLITCH`/`glitchX` =
@@ -135,34 +262,31 @@ crawls in from the side like a snake and settles into place.
   straight CSS band was removed), measured on the viewport via
   `u_rect`) and a shared eased pointer `turn`: the view and the text (--mx/--my, same
   transform as the project page HUD) move against the pointer; the DOM gets scanlines, a rolling band, vignette and occasional text jumps.
-  (04) After hours — "channel surfing": `AfterHours` + `afterHours.hobbies` in about.ts
-  (Football, Game, Music, Coding; one-line notes drafted, not confirmed). Guide names in
-  Inter Tight 800 (Doto stays on the OSD only). One screen: an old-TV
-  channel guide on the left (selected row inverted, Doto), OSD top right ("▶ PLAY", big
-  "CH 0n"), the hobby line bottom left and a segmented volume-style bar that times the
-  auto channel change (CH_MS, only while the section is on screen; clicks restart it).
-  Where the sticky year lets go (`unstickY`), the stage takes the last year back (`yr2`,
-  w[8]) and turns it into the channel's 3D object (w[9]): `shapePoints` → ball (pentagon
-  patches), pad, note (♫) and code ("</>" + code lines) (flat drawings given depth by `extrude`),
-  attributes o0..o3, each with its own rotation (`u_rot[4]`) and mixed by `u_ow` (shared
-  channel = module `tv.ch`); a channel change swirls the particles loose. Far side dimmer.
-  Rejected: music/games lists (too close to the reference), a black hole with orbiting
-  hobbies, and a curved WebGL VHS band (the straight CSS band stays).
-  (05) Contact — `Contact` + `contact` in about.ts. Form (name, email, message) beside a
-  3D old TV (`ContactTv.tsx`, three.js, lazy-loaded near the section, `public/about/tv.glb`).
+  (04) After hours (channel guide + particle hobby objects) was removed at the owner's request;
+  `afterHours` is still in about.ts but unused.
+  (05) Contact — `Contact` + `contact` in about.ts. Form (name, email, message) beside the
+  TV that fell from "What I do" (`AboutTv`; `.ab__contact-tv .ab__tv3d` is only its spot and
+  drag area; `public/about/tv.glb`).
   The TV's screen mesh (`Plane*`) gets a canvas texture fitted to its UV box: static +
   "NO SIGNAL" until you type, then "FROM:" + your message, teletext style; SENDING / THANK
-  YOU on submit. The site is static, so submit opens a prefilled `mailto:` (no backend).
-  From After hours into Contact the particles fly apart and draw the form (`fm`, w[10],
-  attribute 15 = the last free slot): `buildForm` paints the title, label text, field
+  YOU on submit (Contact writes `aboutTv.screen`). The site is static, so submit opens a prefilled `mailto:` (no backend).
+  After the last year (`yr2`, w[8]): the particles first HOLD the year, scrolling up with the page
+  like the real one (`u_y2y`), from `unstickY` to +0.2 screen; only then flow to the form with a
+  gentler swirl (×0.55). Going back up: form glitches to particles → they flow into the year →
+  the year canvas takes over (it used to swirl into a blob right where the year let go).
+  Then they draw the form (`fm`, w[10],
+  attribute 11; w[9] is unused since After hours went): `buildForm` paints the title, label text, field
   underlines and the button (text cut out) at their spot for scroll `formY` (desktop: the
   section top; phones: form top − 14vh, capped at the page bottom), in the stage canvas's
   own units, and `u_fmy` moves them with the scroll. Near `formY` the swap is a GLITCH, not a
   fade (owner's request): the stage sets `.ab__form[data-live]` (hidden when off, `gx-text-in`
   when on) and the particles flicker out over ~0.36 s with slices jumping (`u_glitch`);
   reversed when scrolling back. Autofilled fields are kept dark (-webkit-autofill).
-  The TV can be dragged to turn (with a short throw); ~2.5 s after release it turns back to
-  face you, since the screen shows the message. "↻ Drag to turn" hint under it.
+  Under the form one row (`.ab__contact-foot`): the CREDITS dropdown left, "↔ Drag to tilt" right,
+  same line; opening the credits glitches in (`gx-text-in`) with a blip.
+  The TV can be dragged to tilt only a little (MAX_YAW / MAX_PITCH in AboutTv, never its
+  back; owner's request), with a short throw; ~2.5 s after release it turns back to face you.
+  "↔ Drag to tilt" hint under it.
   The model is "vintage old TV" by FArHAn's 3D worKs (Sketchfab), CC BY 4.0: the credit
   line under the form is required, keep it. Its 4096² texture was downscaled to 1024
   (6.5 MB → 1.6 MB).
@@ -305,15 +429,59 @@ the ffmpeg and cwebp commands.
   OPEN_MS 2100 / CLOSE_MS 1800.
 - sessionStorage keys are removed after 1.5s (not at once): React runs effects twice in dev.
 - Older particle project pages (`ParticleImage`, `ParticleTitle`, `BackLink`) are unused here.
+- 3D background (`scene3d` in projects.ts, KotobaLab: "Japanese street at night" by AFX/CGMotion,
+  CC BY 4.0, credit shown under Info as `.pd__credit`, keep it): three.js renders it on its own
+  canvas at half resolution each frame and that canvas is uploaded as the BG pass's picture
+  (`u_mono` 0.2: mostly colour); the pointer turns the camera (`u_turn` 0 for it). The .glb was
+  73 MB, nearly all textures: `scripts/shrink-glb.cjs` (sharp) → 512px WebP = 6.4 MB.
+  All five have one, all CC BY 4.0 (checked on Sketchfab's API before the award submission;
+  every credit says "modified", as CC BY asks): KotobaLab street; ShopShop "7 eleven" (Pasha-,
+  3.3 MB, NOT merged: its tiled floor uses a second UV set that `--merge` drops; ~cm units);
+  Myanglish "office is old abandoned FREE" (dasy444, `--merge`, 5.1 MB); PeakFit "Training Gym"
+  (local.yany, 2.6M triangles → `--ratio 0.04`, 8.7 MB; has a skin so it can't merge); EmoFace
+  "matrix 2005 scena" (neosearch, 0.1 MB, metal materials → `env` 0.8 RoomEnvironment).
+  Replaced for licences: "Late Night Office" (CC BY-NC) and "Super market for free" (Sketchfab
+  Standard, not CC). Don't use NC / Standard / unlisted licences here.
+  (An "Arcade Room" was tried for ShopShop and replaced.) Per-scene `fov` (the page lens
+  magnifies the middle: wider shows more), `fog` (density in the model's units), `env`,
+  `exposure`; sway scales with the eye–look distance. A model's bbox can include a tall sign or
+  antenna: pick the eye height by looking, not by bbox fractions.
+  `scripts/shrink-glb.cjs`: `--tex` (WebP size), `--merge` (one piece per material, transforms
+  baked: fixes thousands of meshes/draw calls), `--ratio/--error/--min-tris` (meshoptimizer
+  simplify; after a merge keep `--error` small, it is relative to the whole merged mesh, or
+  small objects vanish), `--drop-tangents`.
+- HUD (owner: was hard to read over the dark rooms): dark gradient bands top and bottom
+  (`.pd::before/::after`), yellow labels, text shadow. "Role" became "Built with" (the `stack`
+  list; `role` in projects.ts is no longer shown). The 3D background's credit moved off the
+  page to `/credits` (src/app/credits: every model, the music, the covers, the fonts; CC BY
+  needs it somewhere). Now ALL credits (every model, music, covers, logos, fonts) are ONE small
+  `<details>` dropdown ("CREDITS ▸") at the very bottom of the About page (`Credits.tsx`,
+  `#credits`; owner: there, but never in the spotlight); the /credits route, the home
+  `.sc__credit` line, the About contact credit line and the project "Credits" link were removed
+  (they overlapped the SOUND button). Keep the section: CC BY requires it.
+- Viewer: a click on the middle screen (not a drag) opens the picture whole and uncropped
+  (`.pd__viewer`; arrows/‹ › step, Esc or a click outside closes, Esc no longer leaves the page
+  while it's open).
+- Videos in `gallery` (.mp4/.webm/.mov): drawn into their screen every frame while playing;
+  the one in front plays (muted, looping), the others pause and rewind; thumbnails are
+  <video>. PeakFit's g1/g3 are still frames from Rotato phone-mockup videos: drop the real
+  videos in public/projects/peakfit/ and list them in `gallery` to make them play.
 - KotobaLab background photos (`room-photo.webp`, `shrine-photo.webp`) are git-ignored
   until the owner confirms they're licensed.
 
 ## What's intentionally not here
 
-- No separate About page.
+- (Superseded: `/about` now exists, see "About page" above.)
+- Before an award submission (owner's plan, not yet): the real game covers on the landing
+  cards, the Street Fighter art on the arcade cabinet and the Street Fighter II music are
+  Capcom's / the publishers' IP; swap them then (painted covers: drop `cover` in
+  arcadeGames.ts; a different cabinet model; royalty-free chiptune in `public/audio/`).
 - PeakFit has no live/code link (the old site had none either). Don't invent one.
 
 ## Commands
+
+There is no test runner. Verify with `npm run lint`, `npx tsc --noEmit`, and by looking at
+the page in a browser (most of the work is WebGL, so visual checks matter).
 
 ```bash
 npm run dev     # http://localhost:3000

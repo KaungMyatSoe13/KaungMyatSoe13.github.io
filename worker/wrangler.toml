@@ -1,0 +1,34 @@
+# The "Ask K" assistant's backend (Cloudflare Workers free tier). It adds K's profile
+# (src/knowledge.md) and streams a free Workers AI model's answer back to the site. No API key.
+# Setup steps: ../README.md → "Ask K assistant".
+name = "ask-k"
+main = "src/index.ts"
+compatibility_date = "2026-11-01"
+compatibility_flags = ["nodejs_compat"]
+
+# knowledge.md is bundled as plain text
+rules = [{ type = "Text", globs = ["**/*.md"], fallthrough = true }]
+
+[vars]
+# who may call this Worker (comma-separated origins)
+ALLOWED_ORIGINS = "https://kaungmyatsoe13.github.io,http://localhost:3000"
+# messages per UTC day for the whole site (a spam ceiling; the bot says "closed for today" after)
+DAILY_CAP = "400"
+
+# per-visitor limit: 8 messages a minute per IP (free, built into Workers)
+[[ratelimits]]
+name = "LIMITER"
+namespace_id = "1001"
+simple = { limit = 8, period = 60 }
+
+# the daily counter. Create it with `npx wrangler kv namespace create ASK_K` and paste the id here.
+[[kv_namespaces]]
+binding = "KV"
+id = "950976c20aef4356807293980f710f0e"
+
+# Workers AI: free daily allowance, no key. (The free plan stops at the limit; it never bills.)
+[ai]
+binding = "AI"
+
+# Secret for the bot check (optional): `npx wrangler secret put TURNSTILE_SECRET`.
+# Local dev: put it in worker/.dev.vars (git-ignored).

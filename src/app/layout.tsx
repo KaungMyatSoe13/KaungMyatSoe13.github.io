@@ -3,6 +3,10 @@ import { Doto, Inter_Tight, JetBrains_Mono } from "next/font/google";
 import { site } from "@/content/site";
 import Cursor from "@/components/Cursor";
 import TransitionLayer from "@/components/TransitionLayer";
+import SmoothScroll from "@/components/SmoothScroll";
+import Music from "@/components/Music";
+import Loader from "@/components/Loader";
+import AskK from "@/components/AskK";
 import "./globals.css";
 
 const sans = Inter_Tight({ subsets: ["latin"], variable: "--font-sans", display: "swap" });
@@ -27,14 +31,20 @@ export const viewport: Viewport = {
 
 export default function RootLayout({ children }: Readonly<{ children: React.ReactNode }>) {
   return (
-    <html lang="en" className={`${sans.variable} ${mono.variable} ${dot.variable}`}>
-      <body>
+    // suppressHydrationWarning: browser extensions (e.g. Grammarly) add attributes to <html>
+    // and <body> before React loads; this only ignores attribute differences on these two tags
+    <html lang="en" className={`${sans.variable} ${mono.variable} ${dot.variable}`} suppressHydrationWarning>
+      <body suppressHydrationWarning>
         <a className="skip" href="#work">
           Skip to projects
         </a>
         {children}
         <TransitionLayer />
         <Cursor />
+        <SmoothScroll />
+        <Music />
+        <AskK />
+        <Loader />
       </body>
     </html>
   );

@@ -2,7 +2,7 @@
 
 import { useEffect, useRef, useState } from "react";
 import { K_PARTS, drawK, kBox } from "@/lib/kMark";
-import { floodOrigin } from "@/lib/stage";
+import { floodOrigin, snap } from "@/lib/stage";
 import { site } from "@/content/site";
 
 /*
@@ -541,7 +541,7 @@ export default function InkHero({ arcade = false }: { arcade?: boolean }) {
       jiggle = filledAt ? Math.exp(-(now - filledAt) / 450) : 0;
       // Ease toward the scroll position by real time, so slow devices still finish the flood.
       // For the first half second, jump straight there (landing mid-page shows no flash).
-      if (now - t0 < 500) { readScroll(); shown = progress; }
+      if (now - t0 < 500 || now < snap.until) { readScroll(); shown = progress; }
       else shown += (progress - shown) * (1 - Math.pow(1 - 0.14, dt * 60));
       wrap.style.setProperty("--p", shown.toFixed(3));
       const drained = shown > DRAIN_END - 0.05 ? "1" : "0";

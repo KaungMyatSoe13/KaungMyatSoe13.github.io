@@ -6,7 +6,8 @@
     "dev": "next dev --turbopack",
     "build": "next build",
     "start": "next start",
-    "lint": "eslint"
+    "lint": "eslint",
+    "knowledge": "node --no-warnings scripts/build-assistant-knowledge.mjs"
   },
   "dependencies": {
     "next": "15.5.4",

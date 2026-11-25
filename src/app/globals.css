@@ -587,19 +587,20 @@ html[data-cursor-big="on"] .cursor__ring > span { width: var(--cursor-big); heig
 }
 .sc__list { position: absolute; z-index: 3; left: var(--gutter); top: 0; bottom: 0; width: 1px; pointer-events: none; }
 .sc__list > * { pointer-events: auto; }
-.sc__list .sc__title { position: absolute; left: 0; top: 19svh; white-space: nowrap; }
-/* BMO: the current project's name on its face (three.js, BmoScreen.tsx) */
-.sc__list > .sc__fade:has(.sc__bmo) { position: absolute; left: calc(-1 * var(--gutter) - 1vw); bottom: 0; }
-.sc__bmo { position: relative; width: min(34vw, 500px); height: min(72svh, 700px); cursor: pointer; }
-/* BMO's shadow on the floor, so it stands in front of the screen */
-.sc__bmo::before {
-  content: ""; position: absolute; left: 20%; right: 26%; bottom: 13.5%; height: 6%; pointer-events: none;
-  background: radial-gradient(closest-side, rgba(10, 10, 10, 0.32), transparent); filter: blur(2px);
+.sc__list .sc__menu { position: absolute; left: 0; top: 19svh; white-space: nowrap; }
+/* the menu: arcade select screen — a ▶ points at the hovered item */
+.sc__menu-list { list-style: none; margin: 4px 0 0; padding: 0; display: grid; gap: 2px; }
+.sc__menu-link {
+  position: relative; display: inline-block; padding: 5px 0 5px 22px; color: var(--ink); text-decoration: none;
+  font: 800 clamp(1rem, 1.35vw, 1.3rem)/1 var(--font-dot), var(--font-mono); letter-spacing: 0.02em; text-transform: uppercase;
 }
-.sc__bmo-still { position: absolute; inset: 0; width: 100%; height: 100%; pointer-events: none; }
-.sc__bmo[data-ready="on"] .sc__bmo-still { display: none; }
-.pd .sc--ghost .sc__bmo { cursor: default; }
-.sc__bmo canvas { display: block; width: 100% !important; height: 100% !important; }
+.sc__menu-link::before {
+  content: "▶"; position: absolute; left: 0; top: 50%; transform: translateY(-50%); font-size: 0.7em;
+  opacity: 0; transition: opacity 0.15s steps(1);
+}
+.sc__menu-link:is(:hover, :focus-visible)::before { opacity: 1; animation: menu-blink 0.7s steps(1) infinite; }
+.sc__menu-link:is(:hover, :focus-visible) { color: #d8211b; }
+@keyframes menu-blink { 50% { opacity: 0; } }
 .sc__nums { position: absolute; left: 0; top: calc(19svh + clamp(1.5rem, 2.4vw, 2.3rem) + 16px); list-style: none; margin: 0; padding: 0; display: flex; gap: 6px; }
 .sc__nums :is(button, .sc__ghost-row) {
   display: block; min-width: 34px; padding: 7px 0 6px; background: none; border: 0; border-top: 2px solid rgba(17, 17, 17, 0.18);
@@ -624,13 +625,18 @@ html[data-cursor-big="on"] .cursor__ring > span { width: var(--cursor-big); heig
   font-size: 14px; line-height: 1.45; text-align: right;
 }
 /* the hint sits under "Selected work" (the card wheel runs off the bottom-right corner) */
-.sc .sc__summary { right: auto; bottom: auto; left: var(--gutter); top: calc(19svh + clamp(1.5rem, 2.4vw, 2.3rem) + 14px); text-align: left; max-width: 20ch; }
+.sc .sc__summary { right: auto; bottom: auto; left: var(--gutter); top: calc(19svh + clamp(1.5rem, 2.4vw, 2.3rem) + 3 * (clamp(1rem, 1.35vw, 1.3rem) + 12px) + 30px); text-align: left; max-width: none; white-space: nowrap; }
 .sc__summary span { display: block; margin-top: 6px; font: 11px/1 var(--font-mono); letter-spacing: 0.14em; text-transform: uppercase; color: var(--ink-soft); }
+/* one line, so it reaches over the cabinet: a paper chip behind it keeps it readable */
+.sc .sc__summary span { display: inline-block; padding: 5px 8px; margin-left: -8px; background: color-mix(in srgb, var(--paper) 88%, transparent); color: var(--ink); }
 @media (max-width: 760px) {
   .sc__list .sc__title { display: none; }
+  /* phones: the menu is a row under the top bar */
+  .sc__list .sc__menu { top: 54px; }
+  .sc__menu-list { display: flex; gap: 14px; }
+  .sc__menu-link { padding-left: 0; font-size: 13px; }
+  .sc__menu-link::before { display: none; }
   .sc__nums { top: 92px; }
-  .sc__list > .sc__fade:has(.sc__bmo) { bottom: 40px; }
-  .sc__bmo { width: 44vw; height: 28svh; }
   .sc__credit { white-space: normal; width: calc(100vw - 2 * var(--gutter)); }
   .sc__name { font-size: 15px; }
   .sc__summary { display: none; }
@@ -758,16 +764,41 @@ html[data-cursor-big="on"] .cursor__ring > span { width: var(--cursor-big); heig
   padding: 0 calc(var(--gutter) + 9vw);
   text-transform: uppercase; transform-origin: 50% 100%;
 }
-.pd__label { margin: 0 0 10px; font: 500 15px/1 var(--font-dot), var(--font-mono); letter-spacing: 0.04em; color: rgba(233, 230, 223, 0.45); }
+/* readable over any 3D room: a soft dark band behind the text, bright labels, a text shadow */
+.pd::before {
+  content: ""; position: absolute; left: 0; right: 0; bottom: 0; height: 46vh; z-index: 3; pointer-events: none;
+  background: linear-gradient(to top, rgba(4, 4, 8, 0.86), rgba(4, 4, 8, 0.6) 45%, transparent);
+  opacity: var(--t);
+}
+.pd::after {
+  content: ""; position: absolute; left: 0; right: 0; top: 0; height: 18vh; z-index: 3; pointer-events: none;
+  background: linear-gradient(to bottom, rgba(4, 4, 8, 0.7), transparent); opacity: var(--t);
+}
+.pd__hud { color: #f6f3ec; text-shadow: 0 1px 2px rgba(0, 0, 0, 0.9), 0 0 14px rgba(0, 0, 0, 0.6); }
+.pd__label { margin: 0 0 10px; font: 500 15px/1 var(--font-dot), var(--font-mono); letter-spacing: 0.06em; color: #ffd21f; }
 .pd__name { margin: 0; font: 900 28px/1 var(--font-dot), var(--font-mono); letter-spacing: -0.02em; }
 .pd__text { margin: 0; padding: 0; list-style: none; font: 700 15px/1.25 var(--font-dot), var(--font-mono); letter-spacing: 0.02em; max-width: 30ch; }
-.pd__stack { margin-top: 8px; color: rgba(233, 230, 223, 0.55); }
+.pd__built { display: flex; flex-wrap: wrap; gap: 6px 14px; max-width: 26ch; }
+.pd__built li::before { content: "▸ "; color: #ffd21f; }
 .pd__links { margin: 12px 0 0; display: flex; gap: 18px; font: 700 15px/1 var(--font-dot), var(--font-mono); }
 .pd__links a { color: inherit; text-decoration: none; border-bottom: 1px solid rgba(233, 230, 223, 0.4); padding-bottom: 3px; }
+/* the viewer: the picture whole, over everything */
+.pd__viewer {
+  position: fixed; inset: 0; z-index: 70; display: grid; place-items: center; padding: 8vh 8vw;
+  background: rgba(4, 4, 8, 0.92); cursor: zoom-out; animation: gx-text-in 0.45s steps(1) backwards;
+}
+.pd__viewer :is(img, video) { max-width: 100%; max-height: 100%; object-fit: contain; display: block; cursor: default; box-shadow: 0 20px 60px rgba(0, 0, 0, 0.6); }
+.pd__viewer button { position: absolute; border: 0; background: none; color: #f6f3ec; cursor: pointer; font: 700 15px/1 var(--font-dot), var(--font-mono); letter-spacing: 0.06em; text-transform: uppercase; padding: 14px; }
+.pd__viewer button:hover { color: #ffd21f; }
+.pd__viewer-prev, .pd__viewer-next { top: 50%; transform: translateY(-50%); font-size: 46px !important; }
+.pd__viewer-prev { left: 1.5vw; }
+.pd__viewer-next { right: 1.5vw; }
+.pd__viewer-close { top: calc(var(--gutter) - 10px); left: 50%; transform: translateX(-50%); }
+.pd__viewer-count { position: absolute; bottom: calc(var(--gutter) - 6px); left: 50%; transform: translateX(-50%); margin: 0; font: 700 13px/1 var(--font-dot), var(--font-mono); color: rgba(246, 243, 236, 0.7); }
 .pd__thumbs { list-style: none; margin: 0; padding: 0; display: flex; gap: 10px; align-self: start; }
 .pd__thumbs button { width: 64px; aspect-ratio: 1.55; padding: 0; border: 1px solid rgba(233, 230, 223, 0.25); background: #000; overflow: hidden; opacity: 0.55; transition: opacity 0.3s ease, border-color 0.3s ease; }
 .pd__thumbs button[aria-current="true"], .pd__thumbs button:hover { opacity: 1; border-color: #fff; }
-.pd__thumbs img { width: 100%; height: 100%; object-fit: cover; object-position: top; display: block; }
+.pd__thumbs :is(img, video) { width: 100%; height: 100%; object-fit: cover; object-position: top; display: block; }
 @media (max-width: 760px) {
   .pd__info { grid-template-columns: 1fr; gap: 18px; padding: 0 var(--gutter); bottom: 4vh; }
   .pd__thumbs button { width: 52px; }
@@ -867,51 +898,6 @@ html[data-cursor-big="on"] .cursor__ring > span { width: var(--cursor-big); heig
   76%, 100% { transform: none; clip-path: none; text-shadow: none; opacity: 1; }
 }
 @media (prefers-reduced-motion: reduce) { .gx-text { animation: none; } }
-/* 4. after hours: an old TV's channel guide; each channel's 3D object is made of the
-   particles that were the last year */
-.ab__after { position: relative; z-index: 1; height: 100svh; display: grid; grid-template-rows: auto 1fr auto; padding: 0 var(--gutter); }
-.ab__tv { position: relative; display: grid; align-items: center; }
-.ab__guide { list-style: none; margin: 0; padding: 0; display: grid; gap: 6px; justify-self: start; }
-.ab__guide button {
-  display: grid; grid-template-columns: 62px auto; align-items: center; background: none; border: 0; padding: 0; color: inherit; text-align: left;
-}
-.ab__guide span { font: 11px/1 var(--font-mono); letter-spacing: 0.12em; color: rgba(236, 233, 226, 0.45); }
-.ab__guide b {
-  font: 800 clamp(2rem, 4.4vw, 4.6rem)/1.08 var(--font-sans); letter-spacing: -0.04em;
-  padding: 0 0.12em; opacity: 0.28; transition: opacity 0.25s ease;
-}
-.ab__guide button:hover b { opacity: 0.7; }
-.ab__guide button[aria-current="true"] b { opacity: 1; background: #ece9e2; color: #0b0b0b; }
-.ab__guide button[aria-current="true"] span { color: #ece9e2; }
-.ab__osd { position: absolute; top: 3svh; right: 0; text-align: right; pointer-events: none; }
-.ab__osd-play { margin: 0 0 10px; font: 800 18px/1 var(--font-dot), var(--font-mono); letter-spacing: 0.1em; animation: ab-blink 1.2s steps(1) infinite; }
-@keyframes ab-blink { 50% { opacity: 0; } }
-.ab__osd-ch { margin: 0; font: 900 clamp(3rem, 6vw, 6rem)/0.9 var(--font-dot), var(--font-mono); }
-.ab__osd-name { margin: 10px 0 0; font: 12px/1 var(--font-mono); letter-spacing: 0.16em; text-transform: uppercase; color: rgba(236, 233, 226, 0.55); }
-.ab__tv-foot { display: grid; grid-template-columns: 1fr auto; align-items: end; gap: 4vw; padding-bottom: 8svh; }
-.ab__tv-line { margin: 0; max-width: 34ch; text-wrap: balance; font-size: clamp(1.05rem, 1.5vw, 1.35rem); line-height: 1.45; color: rgba(236, 233, 226, 0.82); }
-/* the time to the next channel, drawn like an old TV's volume bar */
-.ab__seg { width: min(300px, 40vw); height: 14px; background: repeating-linear-gradient(90deg, rgba(236, 233, 226, 0.16) 0 8px, transparent 8px 12px); }
-.ab__seg i {
-  display: block; height: 100%; width: 0;
-  background: repeating-linear-gradient(90deg, #ece9e2 0 8px, transparent 8px 12px);
-  animation: ab-seg linear forwards; animation-play-state: paused;
-}
-.ab__seg[data-run="true"] i { animation-play-state: running; }
-@keyframes ab-seg { to { width: 100%; } }
-.ab :is(.ab__tv, .ab__tv-foot) {
-  transform: perspective(1200px) rotateY(calc(var(--mx) * -5deg)) rotateX(calc(var(--my) * 4deg)) translate3d(calc(var(--mx) * -14px), calc(var(--my) * 8px), 0);
-}
-@media (max-width: 760px) {
-  .ab__tv { align-items: end; }
-  .ab__guide { grid-template-columns: 1fr 1fr; gap: 10px 16px; width: 100%; }
-  .ab__guide button { grid-template-columns: 1fr; gap: 4px; }
-  .ab__guide b { font-size: 1.7rem; }
-  .ab__osd { top: 1svh; }
-  .ab__osd-ch { font-size: 2.4rem; }
-  .ab__tv-foot { grid-template-columns: 1fr; gap: 16px; padding: 22px 0 6svh; }
-  .ab__seg { width: 100%; }
-}
 /* 5. contact: the form beside an old TV (glTF) that shows what you type */
 .ab__contact { position: relative; z-index: 1; min-height: 100svh; display: grid; grid-template-rows: auto 1fr auto; padding: 0 var(--gutter); }
 .ab__contact-grid { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1.15fr); align-items: center; gap: 4vw; }
@@ -936,15 +922,15 @@ html[data-cursor-big="on"] .cursor__ring > span { width: var(--cursor-big); heig
 .ab__contact-tv { position: relative; height: min(70svh, 640px); }
 .ab__tv3d { position: absolute; inset: 0; cursor: grab; touch-action: pan-y; }
 .ab__tv3d[data-drag="on"] { cursor: grabbing; }
-.ab__tv-hint { position: absolute; right: 0; bottom: 0; margin: 0; font: 11px/1 var(--font-mono); letter-spacing: 0.14em; text-transform: uppercase; color: rgba(236, 233, 226, 0.45); pointer-events: none; }
+.ab__tv-hint { margin: 0; font: 11px/1 var(--font-mono); letter-spacing: 0.14em; text-transform: uppercase; color: rgba(236, 233, 226, 0.45); pointer-events: none; white-space: nowrap; }
+/* credits + the TV's hint on one line; */
+.ab__contact-foot { display: flex; justify-content: space-between; align-items: flex-start; gap: 4vw; padding: 2svh 0 16svh; }
+.ab__contact-foot .ab__tv-hint { padding-top: 6px; }
 /* the form appears with a glitch once the particles have drawn it (data-live set by the stage) */
 .ab__form[data-live="off"] { visibility: hidden; }
 .ab__form[data-live="on"] { animation: gx-text-in 0.6s steps(1) backwards; }
 /* browsers paint autofilled fields grey: keep them on the page's dark */
 .ab__form :is(input, textarea):-webkit-autofill { -webkit-box-shadow: 0 0 0 1000px #0b0b0b inset; -webkit-text-fill-color: #ece9e2; caret-color: #ece9e2; transition: background-color 9999s; }
-.ab__tv3d canvas { display: block; width: 100% !important; height: 100% !important; }
-.ab__credit { margin: 0; padding: 0 0 4svh; font: 11px/1.5 var(--font-mono); letter-spacing: 0.04em; color: rgba(236, 233, 226, 0.4); }
-.ab__credit a { color: inherit; }
 .ab :is(.ab__form, .ab__contact-tv) {
   transform: perspective(1200px) rotateY(calc(var(--mx) * -5deg)) rotateX(calc(var(--my) * 4deg)) translate3d(calc(var(--mx) * -14px), calc(var(--my) * 8px), 0);
 }
@@ -986,7 +972,6 @@ html[data-cursor-big="on"] .cursor__ring > span { width: var(--cursor-big); heig
   .ab__year { height: 20svh; }
 }
 
-.sc__nav { display: flex; gap: 22px; }
 
 /* home: no margin collapsing, so <main> is 2 screens and the showcase stays pinned */
 .home { display: flow-root; min-height: 200svh; }
@@ -1034,3 +1019,138 @@ html[data-cursor-big="on"] .cursor__ring > span { width: var(--cursor-big); heig
 @keyframes gx-noise-out { 0%, 40% { opacity: 0; } 55% { opacity: .5; } 70% { opacity: .15; } 85%, 100% { opacity: 1; } }
 @keyframes gx-noise-in { 0% { opacity: 1; } 15% { opacity: .2; } 25% { opacity: .7; } 40% { opacity: .1; } 55%, 100% { opacity: 0; } }
 @media (prefers-reduced-motion: reduce) { .gx-out, .gx-in, .gx-noise { animation: none !important; } }
+/* The About page's one TV (AboutTv): "What I do" icons, the fall, then Contact. Under the
+   particle canvas; the Contact spot (.ab__contact-tv .ab__tv3d) is only its drag area. */
+.ab__abouttv { position: fixed; inset: 0; width: 100vw; height: 100vh; z-index: 0; pointer-events: none; }
+.ab__abouttv canvas { display: block; width: 100% !important; height: 100% !important; }
+/* the page jolts when the TV lands in Contact */
+.ab__contact[data-thud="on"] { animation: ab-thud 0.42s ease-out; }
+@keyframes ab-thud { 0% { transform: translateY(0); } 18% { transform: translateY(5px); } 40% { transform: translateY(-2px); } 62% { transform: translateY(1px); } 100% { transform: none; } }
+@media (prefers-reduced-motion: reduce) { .ab__contact[data-thud="on"] { animation: none; } }
+
+/* the music on/off button (Music.tsx): bottom centre, readable on paper and on dark pages */
+.sound {
+  position: fixed; left: 50%; bottom: 46px; z-index: 60; transform: translateX(-50%);   /* above the credit lines */
+  display: inline-flex; align-items: center; gap: 8px; padding: 6px 10px; border: 0; background: none;
+  font: 11px/1 var(--font-mono); letter-spacing: 0.14em; text-transform: uppercase; color: #fff;
+  mix-blend-mode: difference; cursor: pointer;
+}
+.sound__bars { display: inline-flex; align-items: flex-end; gap: 2px; height: 10px; }
+.sound__bars i { display: block; width: 2px; height: 3px; background: currentColor; }
+.sound[data-on="true"] .sound__bars i { animation: sound-eq 0.9s ease-in-out infinite alternate; }
+.sound[data-on="true"] .sound__bars i:nth-child(2) { animation-delay: -0.3s; }
+.sound[data-on="true"] .sound__bars i:nth-child(3) { animation-delay: -0.6s; }
+.sound[data-on="true"] .sound__bars i:nth-child(4) { animation-delay: -0.15s; }
+@keyframes sound-eq { from { height: 2px; } to { height: 10px; } }
+@media (prefers-reduced-motion: reduce) { .sound__bars i { animation: none !important; height: 6px; } }
+
+/* the first-load counter (Loader.tsx): 1 → 100, climbing from the bottom-right corner to the
+   top-right (--k = 0..1); at 100 it tears away and the ready page is behind it */
+.loader { position: fixed; inset: 0; z-index: 90; background: #0b0b0c; color: #f2efe9; --k: 0; }
+.loader::after {
+  content: ""; position: absolute; inset: 0; pointer-events: none;
+  background: repeating-linear-gradient(0deg, rgba(0, 0, 0, 0.3) 0 1px, transparent 1px 3px);
+}
+.loader__count {
+  position: absolute; right: var(--gutter); margin: 0;
+  --h: clamp(4.5rem, 13vw, 11rem);
+  top: calc(var(--gutter) + (1 - var(--k)) * (100svh - var(--h) - 2 * var(--gutter)));
+  font: 900 var(--h)/1 var(--font-dot), var(--font-mono); letter-spacing: -0.02em; font-variant-numeric: tabular-nums;
+  display: flex; align-items: flex-start; gap: 0.06em;
+}
+.loader__count small { font-size: 0.28em; margin-top: 0.12em; color: #ffd21f; }
+.loader__label {
+  position: absolute; left: var(--gutter); bottom: var(--gutter); margin: 0;
+  font: 11px/1 var(--font-mono); letter-spacing: 0.16em; text-transform: uppercase; color: rgba(242, 239, 233, 0.55);
+}
+.loader[data-leaving="true"] { pointer-events: none; animation: loader-out 0.5s steps(1) forwards; }
+@keyframes loader-out {
+  0% { clip-path: inset(0); transform: none; filter: none; }
+  20% { clip-path: inset(10% 0 46% 0); transform: translateX(-26px); filter: hue-rotate(90deg) saturate(3); }
+  40% { clip-path: inset(54% 0 6% 0); transform: translateX(32px); filter: invert(1); }
+  60% { clip-path: inset(28% 0 30% 0); transform: translateX(-14px) scaleY(0.4); filter: none; }
+  80% { clip-path: inset(48% 0 48% 0); transform: scaleY(0.05); }
+  100% { clip-path: inset(50% 0 50% 0); opacity: 0; visibility: hidden; }
+}
+@media (prefers-reduced-motion: reduce) { .loader[data-leaving="true"] { animation: none; opacity: 0; } }
+/* About's last line: a small "Credits" dropdown (Credits.tsx; CC BY needs it on the site) */
+.credits { position: relative; z-index: 1; flex: 1; min-width: 0; color: rgba(236, 233, 226, 0.7); font: 11px/1.6 var(--font-sans); }
+.credits summary {
+  display: inline-block; cursor: pointer; list-style: none; padding: 6px 0;
+  font: 10px/1 var(--font-mono); letter-spacing: 0.16em; text-transform: uppercase; color: rgba(236, 233, 226, 0.4);
+}
+.credits summary::-webkit-details-marker { display: none; }
+.credits summary::after { content: " ▸"; }
+.credits[open] summary::after { content: " ▾"; }
+.credits summary:hover { color: rgba(236, 233, 226, 0.8); }
+.credits__lead { margin: 8px 0 14px; max-width: 70ch; }
+.credits[open] .credits__body { animation: gx-text-in 0.5s steps(1) backwards; }
+.credits__grid { display: grid; grid-template-columns: 1.4fr 1fr; gap: 3vw; max-width: 1100px; }
+.credits h3 { margin: 0 0 6px; font: 700 10px/1 var(--font-mono); letter-spacing: 0.16em; text-transform: uppercase; color: rgba(255, 210, 31, 0.8); }
+.credits h3:not(:first-child) { margin-top: 14px; }
+.credits ul { list-style: none; margin: 0; padding: 0; display: grid; gap: 3px; }
+.credits a { color: inherit; }
+.credits__where { display: inline-block; font: 9px/1 var(--font-mono); letter-spacing: 0.12em; text-transform: uppercase; color: rgba(236, 233, 226, 0.4); }
+.credits__grid > div:first-child li { display: grid; grid-template-columns: 20ch 1fr; align-items: baseline; }
+@media (max-width: 760px) { .credits__grid { grid-template-columns: 1fr; } .credits__grid > div:first-child li { grid-template-columns: 1fr; } }
+.credits a { color: inherit; }
+.credits__where { display: inline-block; font: 10px/1 var(--font-mono); letter-spacing: 0.12em; text-transform: uppercase; color: rgba(236, 233, 226, 0.45); }
+@media (max-width: 760px) { .credits__grid { grid-template-columns: 1fr; } }
+/* the tech stack: just the particle logo row (StackCarousel.tsx) */
+.ab__stack { position: relative; z-index: 1; padding: 6svh var(--gutter); }
+.ab__stack-row { position: relative; width: calc(100% + 2 * var(--gutter)); margin: 0 calc(-1 * var(--gutter)); height: clamp(240px, 36svh, 360px); align-self: center; }
+.ab__stack-canvas, .ab__stack-names { position: absolute; inset: 0; width: 100%; height: 100%; display: block; }
+.ab__stack-canvas { cursor: grab; touch-action: pan-y; }
+.ab__stack-names { pointer-events: none; }
+.ab__stack-canvas:active { cursor: grabbing; }
+
+
+/* ---------- "Ask K" AI assistant (AskK.tsx): arcade button bottom-left, CRT chat window ---------- */
+.askk-btn {
+  position: fixed; left: var(--gutter); bottom: 64px; z-index: 62;
+  display: inline-flex; align-items: center; gap: 8px; padding: 9px 14px 8px; cursor: pointer;
+  border: 2px solid #111; background: #ffd21f; color: #111; box-shadow: 3px 3px 0 #111;
+  font: 800 14px/1 var(--font-dot), var(--font-mono); letter-spacing: 0.08em; text-transform: uppercase;
+  transition: transform 0.12s steps(2), box-shadow 0.12s steps(2);
+}
+.askk-btn:hover { transform: translate(-1px, -1px); box-shadow: 4px 4px 0 #111; }
+.askk-btn:active, .askk-btn[data-open="true"] { transform: translate(2px, 2px); box-shadow: 1px 1px 0 #111; }
+.askk-btn__coin { font-size: 10px; animation: ab-blink 1.1s steps(1) infinite; }
+@keyframes ab-blink { 50% { opacity: 0; } }
+.askk {
+  --bg: #0c0c0f; --fg: #ece9e2; --soft: rgba(236, 233, 226, 0.55); --line: rgba(236, 233, 226, 0.16);
+  position: fixed; left: var(--gutter); bottom: 112px; z-index: 63;
+  width: min(380px, calc(100vw - 2 * var(--gutter))); height: min(500px, calc(100svh - 150px));
+  display: grid; grid-template-rows: auto 1fr auto auto auto auto;
+  background: var(--bg); color: var(--fg); border: 2px solid #ffd21f; box-shadow: 6px 6px 0 rgba(0, 0, 0, 0.45);
+  font: 14px/1.5 var(--font-sans); overflow: hidden; animation: gx-text-in 0.45s steps(1) backwards;
+}
+.askk::after { content: ""; position: absolute; inset: 0; pointer-events: none; background: repeating-linear-gradient(0deg, rgba(0, 0, 0, 0.12) 0 1px, transparent 1px 3px); }
+.askk__top { display: flex; justify-content: space-between; align-items: center; padding: 10px 12px; border-bottom: 1px solid var(--line); }
+.askk__title { margin: 0; font: 900 18px/1 var(--font-dot), var(--font-mono); }
+.askk__title span { margin-left: 6px; font: 10px/1 var(--font-mono); letter-spacing: 0.14em; text-transform: uppercase; color: var(--soft); }
+.askk__close { border: 0; background: none; color: var(--fg); cursor: pointer; font-size: 14px; padding: 4px 6px; }
+.askk__list { overflow-y: auto; padding: 12px; display: flex; flex-direction: column; gap: 10px; overscroll-behavior: contain; }
+.askk__msg { margin: 0; max-width: 88%; padding: 8px 10px; white-space: pre-wrap; overflow-wrap: anywhere; }
+.askk__msg--bot { align-self: flex-start; border-left: 3px solid #ffd21f; background: color-mix(in srgb, var(--fg) 6%, transparent); }
+.askk__msg--me { align-self: flex-end; background: #ffd21f; color: #111; }
+.askk__msg a { color: inherit; }
+.askk__msg[data-typing="true"]::after { content: "▋"; margin-left: 2px; animation: ab-blink 0.8s steps(1) infinite; }
+.askk__chips { display: flex; flex-wrap: wrap; gap: 6px; padding: 0 12px 10px; }
+.askk__chips button { border: 1px solid var(--line); background: none; color: var(--fg); cursor: pointer; padding: 6px 9px; font: 12px/1.2 var(--font-sans); }
+.askk__chips button:hover { border-color: #ffd21f; }
+.askk__form { display: flex; gap: 8px; padding: 10px 12px; border-top: 1px solid var(--line); }
+.askk__form textarea { flex: 1; resize: none; border: 0; border-bottom: 1px solid var(--line); background: none; color: var(--fg); font: 14px/1.4 var(--font-sans); padding: 6px 0; outline: none; max-height: 90px; }
+.askk__form textarea:focus { border-bottom-color: #ffd21f; }
+.askk__form button { border: 2px solid #111; background: #ffd21f; color: #111; width: 38px; cursor: pointer; font-size: 13px; }
+.askk__form button:disabled { opacity: 0.4; cursor: default; }
+.askk__check:empty { display: none; }
+.askk__check { padding: 0 12px 6px; }
+.askk__note { margin: 0; padding: 0 12px 10px; font: 10px/1.4 var(--font-mono); letter-spacing: 0.04em; color: var(--soft); }
+.askk__note a { color: inherit; }
+/* phones: the button in the very corner (clear of thumbnails and texts), the chat nearly full width */
+@media (max-width: 760px) {
+  .askk-btn { bottom: 14px; padding: 7px 11px 6px; font-size: 12px; }
+  .askk { bottom: 58px; height: min(480px, calc(100svh - 120px)); }
+}
+@media (prefers-reduced-motion: reduce) { .askk, .askk-btn__coin { animation: none; } }

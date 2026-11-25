@@ -43,3 +43,8 @@ next-env.d.ts
 # Stock-photo derivative: keep out of the public repo until it is licensed
 public/projects/kotobalab/room-photo.webp
 public/projects/kotobalab/shrine-photo.webp
+
+# Ask K worker
+worker/node_modules
+worker/.wrangler
+worker/.dev.vars
