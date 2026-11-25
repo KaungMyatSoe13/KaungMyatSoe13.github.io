@@ -9,9 +9,16 @@ import { projects } from "../src/content/projects.ts";
 import { stack } from "../src/content/stack.ts";
 
 const root = new URL("..", import.meta.url);
+// unconfirmed drafts never reach the bot: a TODO item is skipped with its wrapped lines
+let inTodo = false;
 const facts = readFileSync(new URL("src/content/assistant-facts.md", root), "utf8")
   .split("\n")
-  .filter((l) => !/^\s*-?\s*TODO\b/.test(l))          // unconfirmed drafts never reach the bot
+  .filter((l) => {
+    if (/^\s*-?\s*TODO\b/.test(l)) { inTodo = true; return false; }
+    if (inTodo && /^\s{2,}\S/.test(l)) return false;           // its continuation lines
+    inTodo = false;
+    return true;
+  })
   .join("\n")
   .replace(/^# Extra facts[\s\S]*?(?=^## )/m, "");     // drop the file's own instructions
 

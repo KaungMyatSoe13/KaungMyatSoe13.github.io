@@ -20,7 +20,7 @@ interface Env {
 }
 
 /** A free Workers AI model. Swap it here if you want a different one (see developers.cloudflare.com/workers-ai/models). */
-const MODEL = "@cf/meta/llama-3.1-8b-instruct";
+const MODEL = "@cf/google/gemma-4-26b-a4b-it";
 type Msg = { role: "user" | "assistant"; content: string };
 const MAX_TURNS = 10, MAX_CHARS = 600, PASS_MS = 30 * 60 * 1000;
 
@@ -121,6 +121,7 @@ export default {
             stream: true,
             max_tokens: 300,
             temperature: 0.3,
+            chat_template_kwargs: { enable_thinking: false },   // answer straight away (thinking ate the budget)
           });
           if (!(res instanceof ReadableStream)) {
             ctrl.enqueue(enc.encode((res as { response?: string }).response ?? ""));

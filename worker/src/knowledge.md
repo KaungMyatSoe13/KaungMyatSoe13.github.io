@@ -69,7 +69,6 @@
   plugins he wrote himself. He deploys the sites live himself.
 - Before that he freelanced for about 10 months after graduating (2025): websites and apps for
   his own clients, from the first call to going live.
-  freelance React / Next.js and WordPress projects; happy to chat about full-time roles".
 - Best way to reach him: email (kaungsoe132004@gmail.com) or LinkedIn.
 
 ## Skills (from his CV)
