@@ -1,7 +1,7 @@
 "use client";
 
 import { releaseGl } from "@/lib/releaseGl";
-import { lightInk } from "@/lib/stage";
+import { iosSafari, lightInk } from "@/lib/stage";
 import { drawScreenFace } from "@/lib/screenFace";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
@@ -401,7 +401,7 @@ export default function ProjectDetail({ index }: { index: number }) {
           canvas: c3, tex: t3,
           draw: (yaw, pitch, t) => {
             // half resolution: it sits behind the screens, under the lens and VHS
-            const k = lightInk() ? 0.35 : 0.5;
+            const k = lightInk() && !iosSafari() ? 0.35 : 0.5;
             const w = Math.max(2, Math.round(canvas.width * k)), h = Math.max(2, Math.round(canvas.height * k));
             if (size !== `${w}x${h}`) { size = `${w}x${h}`; r3.setSize(w, h, false); cam.aspect = w / h; cam.updateProjectionMatrix(); }
             // standing in the street, swaying a little; the pointer turns the head
@@ -420,7 +420,7 @@ export default function ProjectDetail({ index }: { index: number }) {
     let fbo: WebGLFramebuffer | null = null, fboTex: WebGLTexture | null = null;
     const fit = () => {
       // phones / tablets: 1.5× is plenty under the lens and VHS, and saves GPU memory
-      const d = Math.min(window.devicePixelRatio || 1, lightInk() ? 1.5 : 2);
+      const d = Math.min(window.devicePixelRatio || 1, lightInk() && !iosSafari() ? 1.5 : 2);
       const w = Math.round(window.innerWidth * d), h = Math.round(window.innerHeight * d);
       if (fbo && w === canvas.width && h === canvas.height) return;
       canvas.width = w; canvas.height = h;

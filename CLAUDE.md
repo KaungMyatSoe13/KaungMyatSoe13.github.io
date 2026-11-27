@@ -442,6 +442,12 @@ notes are history, not instructions. Big-picture map: `src/content/*` (data) →
   texture + framebuffer on every resize (mobile toolbars resize often) and now frees the old one
   and skips same-size resizes; touch devices draw the project room at 0.35 (was 0.5) and the page
   at ≤1.5× pixel ratio.
+  Then Safari glitched while scrolling the landing (its toolbar hides mid-scroll, so dvh changed
+  and the stage resized): SAFARI ONLY is back to the old version (owner): an inline script in the
+  layout's <head> sets `html[data-ios-safari]` (iPhone/iPad Safari, not CriOS / GSA / FxiOS /
+  EdgiOS; `iosSafari()` in stage.ts is the same test) → `.ink-stage` / `.sc` 100lvh, and the
+  project page keeps 0.5 room resolution and 2× pixel ratio there. The memory fixes stay for all.
+  (Playwright WebKit reports maxTouchPoints 0: fake 5 with addInitScript to test it.)
 
 ## Page switch (glitch)
 

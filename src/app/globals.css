@@ -568,6 +568,9 @@ html[data-cursor-big="on"] .cursor__ring > span { width: var(--cursor-big); heig
   overflow: hidden;
   color: var(--ink);
 }
+/* Safari on iPhone / iPad: back to the full height. dvh there changes while its toolbar hides
+   during the scroll, so the landing and showcase resized mid-scroll (glitching). */
+html[data-ios-safari] .ink-stage, html[data-ios-safari] .sc { height: 100lvh; }
 .sc::after {   /* goes dark while zooming into / out of a project */
   content: ""; position: absolute; inset: 0; z-index: 4; pointer-events: none;
   background: #050505; opacity: var(--dark, 0);

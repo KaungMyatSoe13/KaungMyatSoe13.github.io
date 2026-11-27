@@ -18,3 +18,9 @@ export const lightInk = () =>
  * jump back to the landing sets it; see `glitchJump` in tv.ts).
  */
 export const snap = { until: 0 };
+
+/** Safari itself on iPhone / iPad (not Chrome, Firefox, Edge or the Google app, which all run on
+ *  WebKit too). Safari hides its toolbar while you scroll: there the showcase stays at the full
+ *  height (lvh) and the project page at its first resolution, the versions that ran smoothly. */
+export const iosSafari = () => typeof navigator !== "undefined" && navigator.maxTouchPoints > 1
+  && /iP(hone|ad|od)|Macintosh/.test(navigator.userAgent) && /Safari\//.test(navigator.userAgent) && !/CriOS|FxiOS|EdgiOS|OPiOS|GSA\/|YaBrowser|DuckDuckGo/.test(navigator.userAgent);

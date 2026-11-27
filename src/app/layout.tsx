@@ -35,6 +35,10 @@ export default function RootLayout({ children }: Readonly<{ children: React.Reac
     // suppressHydrationWarning: browser extensions (e.g. Grammarly) add attributes to <html>
     // and <body> before React loads; this only ignores attribute differences on these two tags
     <html lang="en" className={`${sans.variable} ${mono.variable} ${dot.variable}`} suppressHydrationWarning>
+      <head>
+        {/* Safari on iPhone / iPad keeps the full-height (lvh) layout: see globals.css */}
+        <script dangerouslySetInnerHTML={{ __html: "try{var u=navigator.userAgent;if(navigator.maxTouchPoints>1&&/iP(hone|ad|od)|Macintosh/.test(u)&&/Safari\\//.test(u)&&!/CriOS|FxiOS|EdgiOS|OPiOS|GSA\\/|YaBrowser|DuckDuckGo/.test(u))document.documentElement.setAttribute('data-ios-safari','')}catch(e){}" }} />
+      </head>
       <body suppressHydrationWarning>
         <a className="skip" href="#work">
           Skip to projects
