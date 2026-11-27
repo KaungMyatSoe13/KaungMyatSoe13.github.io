@@ -1,5 +1,6 @@
 "use client";
 
+import { releaseGl } from "@/lib/releaseGl";
 import { useEffect, useRef } from "react";
 import { skills } from "@/content/about";
 import { loadShell, loadTv, type Shell } from "@/lib/tvModel";
@@ -423,7 +424,7 @@ export default function AboutTv({ turn }: { turn: { x: number; y: number } }) {
       raf = requestAnimationFrame(frame);
       stop = () => {
         window.clearTimeout(later);
-        cancelAnimationFrame(raf); ro.disconnect(); renderer.dispose(); renderer.domElement.remove(); aboutTv.ready = false;
+        cancelAnimationFrame(raf); ro.disconnect(); renderer.dispose(); renderer.domElement.remove(); releaseGl(renderer.domElement, 0); aboutTv.ready = false;
         pad?.removeEventListener("pointerdown", down); pad?.removeEventListener("pointermove", move);
         pad?.removeEventListener("pointerup", up); pad?.removeEventListener("pointercancel", up);
       };

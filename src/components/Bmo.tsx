@@ -1,5 +1,6 @@
 "use client";
 
+import { releaseGl } from "@/lib/releaseGl";
 import { useEffect, useRef } from "react";
 import { loading } from "@/lib/loading";
 
@@ -203,7 +204,7 @@ export default function Bmo({ mood }: { mood: React.RefObject<BmoMood> }) {
         renderer.render(scene, camera);
       };
       raf = requestAnimationFrame(frame);
-      stop = () => { cancelAnimationFrame(raf); removeEventListener("pointermove", onMove); renderer.dispose(); renderer.domElement.remove(); };
+      stop = () => { cancelAnimationFrame(raf); removeEventListener("pointermove", onMove); renderer.dispose(); renderer.domElement.remove(); releaseGl(renderer.domElement, 0); };
     }
     return () => { alive = false; window.clearInterval(wait); stop(); };
   }, [mood]);

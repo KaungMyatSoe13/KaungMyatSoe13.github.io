@@ -93,6 +93,7 @@ body {
   top: 0;
   z-index: 2;
   height: 100lvh;
+  height: 100dvh;   /* what is actually visible (Chrome / the Google app keep their bars on screen) */
   overflow: hidden;
 }
 .ink-hero[data-drained="1"] .ink-stage { pointer-events: none; }
@@ -561,6 +562,9 @@ html[data-cursor-big="on"] .cursor__ring > span { width: var(--cursor-big); heig
   z-index: 0;
   margin-top: -200lvh;
   height: 100lvh;
+  /* the visible height: with lvh, browsers whose toolbars stay on screen (Chrome on iPhone, the
+     Google app) pinned it to the page's bottom with its top (logo, menu) cut off */
+  height: 100dvh;
   overflow: hidden;
   color: var(--ink);
 }

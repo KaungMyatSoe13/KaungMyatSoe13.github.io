@@ -1,5 +1,7 @@
 "use client";
 
+import { releaseGl } from "@/lib/releaseGl";
+import { lightInk } from "@/lib/stage";
 import { drawScreenFace } from "@/lib/screenFace";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
@@ -399,7 +401,8 @@ export default function ProjectDetail({ index }: { index: number }) {
           canvas: c3, tex: t3,
           draw: (yaw, pitch, t) => {
             // half resolution: it sits behind the screens, under the lens and VHS
-            const w = Math.max(2, Math.round(canvas.width * 0.5)), h = Math.max(2, Math.round(canvas.height * 0.5));
+            const k = lightInk() ? 0.35 : 0.5;
+            const w = Math.max(2, Math.round(canvas.width * k)), h = Math.max(2, Math.round(canvas.height * k));
             if (size !== `${w}x${h}`) { size = `${w}x${h}`; r3.setSize(w, h, false); cam.aspect = w / h; cam.updateProjectionMatrix(); }
             // standing in the street, swaying a little; the pointer turns the head
             cam.position.set(eye.x + Math.sin(t * 0.21) * sway, eye.y + Math.sin(t * 0.37) * sway * 0.4, eye.z);
@@ -409,15 +412,21 @@ export default function ProjectDetail({ index }: { index: number }) {
             r3.render(sc3, cam);
           },
         };
-        placeStop = () => { r3.dispose(); gl.deleteTexture(t3); };
+        placeStop = () => { r3.dispose(); gl.deleteTexture(t3); releaseGl(c3, 0); };
       })().catch((e) => console.warn("[scene3d]", e));
     }
 
     // offscreen target for the lens pass
     let fbo: WebGLFramebuffer | null = null, fboTex: WebGLTexture | null = null;
     const fit = () => {
-      const d = Math.min(window.devicePixelRatio || 1, 2);
-      canvas.width = Math.round(window.innerWidth * d); canvas.height = Math.round(window.innerHeight * d);
+      // phones / tablets: 1.5× is plenty under the lens and VHS, and saves GPU memory
+      const d = Math.min(window.devicePixelRatio || 1, lightInk() ? 1.5 : 2);
+      const w = Math.round(window.innerWidth * d), h = Math.round(window.innerHeight * d);
+      if (fbo && w === canvas.width && h === canvas.height) return;
+      canvas.width = w; canvas.height = h;
+      // the old target is freed (each mobile toolbar show / hide used to leave one behind)
+      if (fbo) gl.deleteFramebuffer(fbo);
+      if (fboTex) gl.deleteTexture(fboTex);
       fboTex = gl.createTexture();
       gl.bindTexture(gl.TEXTURE_2D, fboTex);
       gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, canvas.width, canvas.height, 0, gl.RGBA, gl.UNSIGNED_BYTE, null);
@@ -764,7 +773,7 @@ export default function ProjectDetail({ index }: { index: number }) {
     return () => {
       cancelAnimationFrame(raf); window.clearInterval(measureT);
       vids.forEach((v) => { if (v) { v.el.pause(); v.el.removeAttribute("src"); v.el.load(); v.el.remove(); } });
-      placeDead = true; placeStop();
+      placeDead = true; placeStop(); releaseGl(canvas);
       window.removeEventListener("resize", fit);
       window.removeEventListener("pointermove", onMove);
       canvas.removeEventListener("pointerdown", onDown);

@@ -433,6 +433,16 @@ notes are history, not instructions. Big-picture map: `src/content/*` (data) →
   and won), `.ab__stack` pulls up into the tabs' empty BMO room (-170px / phones -88px), fixed row
   heights (150 / 118px), last timeline item has no min-height.
 
+- Pass 7 (owner's iPhone test in Chrome, Safari and the Google app, 2026-11-27): Chrome on iPhone
+  keeps its toolbars on screen, so the `100lvh` showcase (pinned at the page bottom) lost its top
+  (logo, menu): `.sc` and `.ink-stage` are now `100dvh` (the scroll length stays in lvh). The
+  Google app reloaded the page on a project page (out of memory): every WebGL canvas now frees its
+  context when it leaves the page (`releaseGl` in src/lib/releaseGl.ts: waits, skips canvases still
+  in the page, so React's dev double-mount is safe); ProjectDetail's `fit()` leaked a full-screen
+  texture + framebuffer on every resize (mobile toolbars resize often) and now frees the old one
+  and skips same-size resizes; touch devices draw the project room at 0.35 (was 0.5) and the page
+  at ≤1.5× pixel ratio.
+
 ## Page switch (glitch)
 
 - `src/lib/tv.ts` + `TvLink.tsx` (names kept): showcase "About" and About "Selected work" play

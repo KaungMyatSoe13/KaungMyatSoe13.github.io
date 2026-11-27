@@ -1,5 +1,6 @@
 "use client";
 
+import { releaseGl } from "@/lib/releaseGl";
 import { useCallback, useEffect, useLayoutEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { projects } from "@/content/projects";
@@ -1117,7 +1118,7 @@ export default function ArcadeShowcase() {
         canvas.removeEventListener("click", onClick); canvas.removeEventListener("pointermove", onHover);
         canvas.removeEventListener("pointerdown", onDown); canvas.removeEventListener("pointermove", onDrag);
         canvas.removeEventListener("pointerup", onUp); canvas.removeEventListener("pointercancel", onUp);
-        renderer.dispose(); rt.dispose(); rtC.dispose(); rtB.dispose();
+        renderer.dispose(); rt.dispose(); rtC.dispose(); rtB.dispose(); releaseGl(canvas);
       };
     })().catch((e) => { console.warn("[showcase]", e); [ldArcade, ldCard, ldCovers, ldFrame].forEach((f) => f(1)); });
 

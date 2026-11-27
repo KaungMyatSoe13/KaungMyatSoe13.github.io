@@ -1,5 +1,6 @@
 "use client";
 
+import { releaseGl } from "@/lib/releaseGl";
 import { useEffect, useRef, useState } from "react";
 import { K_PARTS, drawK, kBox } from "@/lib/kMark";
 import { floodOrigin, lightInk, snap } from "@/lib/stage";
@@ -626,7 +627,7 @@ export default function InkHero({ arcade = false }: { arcade?: boolean }) {
     raf = requestAnimationFrame(frame);
 
     return () => {
-      cancelAnimationFrame(raf);
+      cancelAnimationFrame(raf); releaseGl(canvas);
       window.removeEventListener("load", onLoad);
       io.disconnect();
       window.removeEventListener("pointermove", onMove);

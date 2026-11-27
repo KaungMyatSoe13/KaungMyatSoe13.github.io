@@ -1,5 +1,6 @@
 "use client";
 
+import { releaseGl } from "@/lib/releaseGl";
 import { useEffect, useRef } from "react";
 import { stack } from "@/content/stack";
 
@@ -201,6 +202,7 @@ export default function StackCarousel() {
       canvas.removeEventListener("pointerdown", onDown); canvas.removeEventListener("pointerup", onUp);
       canvas.removeEventListener("pointercancel", onUp); canvas.removeEventListener("pointerleave", onLeave);
       canvas.removeEventListener("wheel", onWheel);
+      releaseGl(canvas);
     };
   }, []);
   return (

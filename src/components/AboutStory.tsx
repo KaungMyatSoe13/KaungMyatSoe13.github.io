@@ -1,5 +1,6 @@
 "use client";
 
+import { releaseGl } from "@/lib/releaseGl";
 import Link from "next/link";
 import { useEffect, useLayoutEffect, useRef, useState } from "react";
 import { aboutIntro, contact, experience, skills, type SkillIcon } from "@/content/about";
@@ -706,7 +707,7 @@ function Portrait({ src }: { src: string }) {
       raf = requestAnimationFrame(frame);
       cleanup = () => { removeEventListener("resize", onResize); removeEventListener("pointermove", onMove); document.removeEventListener("pointerleave", onLeave); };
     }).catch(() => {});
-    return () => { alive = false; cancelAnimationFrame(raf); cleanup(); delete document.documentElement.dataset.cursorBig; };
+    return () => { alive = false; cancelAnimationFrame(raf); cleanup(); delete document.documentElement.dataset.cursorBig; releaseGl(canvas); };
   }, [src]);
   return <canvas ref={ref} className="ab__portrait" role="img" aria-label="Portrait of Kaung Myat Soe, drawn in particles. Hover to reveal the photo." />;
 }
@@ -841,7 +842,7 @@ function YearParticles({ year }: { year: string }) {
     };
     // wait for the web font so the digits are drawn in Inter Tight
     (document.fonts?.ready ?? Promise.resolve()).then(() => { raf = requestAnimationFrame(frame); });
-    return () => { cancelAnimationFrame(raf); removeEventListener("resize", onResize); removeEventListener("pointermove", onMove); };
+    return () => { cancelAnimationFrame(raf); removeEventListener("resize", onResize); removeEventListener("pointermove", onMove); releaseGl(canvas); };
   }, []);
   return <canvas ref={ref} className="ab__year" aria-hidden="true" />;
 }
@@ -925,7 +926,7 @@ function CrtBackground() {
       gl.drawArrays(gl.TRIANGLES, 0, 3);
     };
     raf = requestAnimationFrame(frame);
-    return () => { cancelAnimationFrame(raf); removeEventListener("resize", fit); removeEventListener("pointermove", onMove); };
+    return () => { cancelAnimationFrame(raf); removeEventListener("resize", fit); removeEventListener("pointermove", onMove); releaseGl(canvas); };
   }, []);
   return <canvas ref={ref} className="ab__bg" aria-hidden="true" />;
 }
