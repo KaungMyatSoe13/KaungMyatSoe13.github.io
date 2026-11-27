@@ -8,7 +8,7 @@ export const site = {
   location: "Singapore",
   /** One short line under the project list. Keep it under ~12 words. */
   intro: "Web, mobile and machine-learning projects I designed and built.",
-  url: "https://kaungmyatsoe13.github.io",
+  url: "https://k-the.dev",
   email: "kaungsoe132004@gmail.com",
   resume: "/files/KaungMyatSoe_CV.pdf",
   socials: [

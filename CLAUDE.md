@@ -15,7 +15,8 @@ one TV that falls through the page, contact form), five project pages with 3D ro
 mascot (BMO) on every page, and webcam "Hand mode". First visit shows a 1 → 100 loader.
 
 - Owner: Kaung Myat Soe (personal, not OOm work)
-- Live: https://kaungmyatsoe13.github.io/
+- Live: https://k-the.dev/ (domain bought 2026-11-28 at Cloudflare Registrar; GitHub Pages custom
+  domain; https://kaungmyatsoe13.github.io/ redirects there)
 - Repo: https://github.com/KaungMyatSoe13/KaungMyatSoe13.github.io
 - Old site being replaced: http://kfolio.online/
 

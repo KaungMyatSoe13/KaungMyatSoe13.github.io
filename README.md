@@ -92,7 +92,7 @@ One-time setup (all free):
    npx wrangler kv namespace create ASK_K   # paste the printed id into wrangler.toml (PASTE_KV_NAMESPACE_ID_HERE)
    ```
 2. **Bot check (recommended):** Cloudflare dashboard → Turnstile → Add widget → domain
-   `kaungmyatsoe13.github.io` (+ `localhost`) → copy the **site key** (public) and the
+   `k-the.dev`, `kaungmyatsoe13.github.io` (+ `localhost`) → copy the **site key** (public) and the
    **secret key**, then `npx wrangler secret put TURNSTILE_SECRET` and paste the secret key.
 3. **Deploy:** in the project root `npm run knowledge`, then `cd worker && npm run deploy`.
    It prints the Worker URL, like `https://ask-k.<you>.workers.dev`.

@@ -11,7 +11,7 @@ rules = [{ type = "Text", globs = ["**/*.md"], fallthrough = true }]
 
 [vars]
 # who may call this Worker (comma-separated origins)
-ALLOWED_ORIGINS = "https://kaungmyatsoe13.github.io,http://localhost:3000"
+ALLOWED_ORIGINS = "https://k-the.dev,https://www.k-the.dev,https://kaungmyatsoe13.github.io,http://localhost:3000"
 # messages per UTC day for the whole site (a spam ceiling; the bot says "closed for today" after)
 DAILY_CAP = "400"
 

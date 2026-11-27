@@ -51,6 +51,9 @@ export async function sendContact(form: FormData): Promise<ContactResult> {
     const r = await fetch(`${URL_}/contact`, { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ ...data, recaptcha }) });
     if (r.ok) return { ok: true };
     const d = (await r.json().catch(() => ({}))) as { error?: string; message?: string };
+    // the human check failed (or reCAPTCHA isn't set up for this address): a real visitor still
+    // gets through, by their own mail app
+    if (d.error === "verify") return { ok: false, message: "", fallback: true };
     if (d.message) return { ok: false, message: d.message };
     return { ok: false, message: "", fallback: true };                // not set up / send failed
   } catch {

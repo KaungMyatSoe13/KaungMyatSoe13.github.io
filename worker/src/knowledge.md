@@ -2,9 +2,9 @@
 - Also known as: K
 - Role: Full-stack developer
 - Based in: Singapore
-- Website: https://kaungmyatsoe13.github.io
+- Website: https://k-the.dev
 - Email: kaungsoe132004@gmail.com
-- Résumé (PDF): https://kaungmyatsoe13.github.io/files/KaungMyatSoe_CV.pdf
+- Résumé (PDF): https://k-the.dev/files/KaungMyatSoe_CV.pdf
 - GitHub: https://github.com/KaungMyatSoe13
 - LinkedIn: https://www.linkedin.com/in/kforsure/
 
@@ -36,32 +36,32 @@
 - His part: Design, Full-stack development
 - Live: https://kotoba-lab.vercel.app
 - Code: https://github.com/KaungMyatSoe13/KotobaLab
-- Page on his site: https://kaungmyatsoe13.github.io/projects/kotobalab/
+- Page on his site: https://k-the.dev/projects/kotobalab/
 ### ShopShop (Web, 2025)
 - Online store with order tracking and an admin dashboard.
 - Built with: MongoDB, Express, React, Node, Cloudinary
 - His part: Full-stack development, Admin dashboard
 - Live: https://shop-shop-pied.vercel.app
 - Code: https://github.com/KaungMyatSoe13/ShopShop
-- Page on his site: https://kaungmyatsoe13.github.io/projects/shopshop/
+- Page on his site: https://k-the.dev/projects/shopshop/
 ### Myanglish Translator (Web, 2025)
 - Turns romanised Burmese into Burmese script as you type.
 - Built with: React, Tailwind CSS
 - His part: Frontend development
 - Live: https://myanglish-translator-peach.vercel.app
 - Code: https://github.com/KaungMyatSoe13/myanglish-translator
-- Page on his site: https://kaungmyatsoe13.github.io/projects/myanglish/
+- Page on his site: https://k-the.dev/projects/myanglish/
 ### PeakFit (Mobile, 2024)
 - Fitness app with workout plans, progress tracking and an admin panel.
 - Built with: React Native, TypeScript, Firebase
 - His part: App development, Admin dashboard
-- Page on his site: https://kaungmyatsoe13.github.io/projects/peakfit/
+- Page on his site: https://k-the.dev/projects/peakfit/
 ### EmoFace (AI, 2024)
 - Reads emotions from faces with a deep-learning model.
 - Built with: Python, TensorFlow, PyTorch, OpenCV
 - His part: AI / ML development
 - Code: https://github.com/APS4087/EMOFACE
-- Page on his site: https://kaungmyatsoe13.github.io/projects/emoface/
+- Page on his site: https://k-the.dev/projects/emoface/
 
 ## Work and availability
 - Currently a web developer at a marketing agency in Singapore (since 2026): WordPress,
