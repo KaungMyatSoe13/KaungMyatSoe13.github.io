@@ -1,6 +1,6 @@
 import type { Metadata } from "next";
 import { site } from "@/content/site";
-import AboutStory from "@/components/AboutStory";
+import AboutSwitch from "@/components/AboutSwitch";
 
 export const metadata: Metadata = {
   title: `About · ${site.name}`,
@@ -8,5 +8,5 @@ export const metadata: Metadata = {
 };
 
 export default function AboutPage() {
-  return <AboutStory />;
+  return <AboutSwitch />;
 }

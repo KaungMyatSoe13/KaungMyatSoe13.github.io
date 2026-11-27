@@ -1306,3 +1306,41 @@ html[data-ios-safari] .ink-stage, html[data-ios-safari] .sc { height: 100lvh; }
 .hand-dot--click::before { transform: scale(0.55); background: #ffd21f; }
 .hand-dot--down::before { transform: scale(0.65); background: #ffd21f; border-color: #ff3b3b; box-shadow: 0 0 0 2px #111, 0 0 16px rgba(255, 59, 59, 0.8); }
 @media (max-width: 1024px), (any-pointer: coarse) { .hand-btn, .hand-panel, .hand-msg { display: none; } }
+
+/* ---------- About on phones and tablets: the still version (AboutStatic) ---------- */
+.abs { padding: 0 var(--gutter); }
+.abs .ab__top { left: var(--gutter); right: var(--gutter); }
+.abs__me { display: grid; gap: 28px; padding: calc(var(--gutter) + 64px) 0 56px; }
+.abs__photo { display: block; width: 100%; max-width: 420px; max-height: 58svh; object-fit: contain; object-position: bottom center; margin: 0 auto; filter: grayscale(1) contrast(1.05); }
+.abs__me-text { max-width: 620px; }
+.abs__body { max-width: 60ch; }
+.abs__sec { padding: 48px 0; border-top: 1px solid rgba(236, 233, 226, 0.12); }
+.abs__head { display: flex; justify-content: space-between; align-items: baseline; gap: 16px; flex-wrap: wrap; margin-bottom: 24px; }
+.abs__head .ab__label { margin: 0; }
+.abs__note { margin: 0; font: 11px/1.4 var(--font-mono); letter-spacing: 0.08em; color: rgba(236, 233, 226, 0.5); }
+.abs__skills { list-style: none; margin: 0; padding: 0; display: grid; grid-template-columns: repeat(auto-fill, minmax(260px, 1fr)); gap: 16px; }
+.abs__skills li { min-width: 0; border: 1px solid rgba(236, 233, 226, 0.14); background: rgba(236, 233, 226, 0.03); padding: 18px 18px 20px; }
+.abs__icon { display: block; width: 100%; max-width: 220px; height: auto; aspect-ratio: 1000 / 720; margin: 0 0 14px; opacity: 0.9; }
+.abs__num { margin: 0 0 6px; font: 11px/1 var(--font-mono); letter-spacing: 0.14em; color: #ffd21f; }
+.abs__skills h3, .abs__time h3 { margin: 0 0 6px; font: 700 22px/1.15 var(--font-sans); letter-spacing: -0.02em; }
+.abs__tag { margin: 0 0 8px; font-size: 14px; color: rgba(236, 233, 226, 0.85); }
+.abs__text { margin: 0; font-size: 14px; line-height: 1.55; color: rgba(236, 233, 226, 0.62); }
+.abs__stack { list-style: none; margin: 0; padding: 0; display: grid; grid-template-columns: repeat(auto-fill, minmax(84px, 1fr)); gap: 18px 10px; }
+.abs__stack li { display: grid; justify-items: center; gap: 8px; color: rgba(236, 233, 226, 0.78); }
+.abs__stack li[data-main] { color: #ffd21f; }
+.abs__stack svg { width: 34px; height: 34px; }
+.abs__stack span { font: 10px/1.2 var(--font-mono); letter-spacing: 0.08em; text-transform: uppercase; text-align: center; }
+.abs__lead { max-width: 24ch; margin-bottom: 28px; }
+.abs__time { list-style: none; margin: 0; padding: 0 0 0 20px; border-left: 1px solid rgba(236, 233, 226, 0.18); display: grid; gap: 32px; }
+.abs__time li { position: relative; }
+.abs__time li::before { content: ""; position: absolute; left: -25px; top: 10px; width: 9px; height: 9px; border-radius: 50%; background: #ece9e2; }
+.abs__year { margin: 0 0 6px; font: 900 34px/1 var(--font-dot), var(--font-mono); color: #ece9e2; }
+.abs__year i { margin-left: 10px; vertical-align: middle; font: 700 10px/1 var(--font-mono); font-style: normal; letter-spacing: 0.12em; text-transform: uppercase; background: #ffd21f; color: #0b0b0b; padding: 3px 6px; }
+.abs__where { margin: 0 0 8px; font: 11px/1.4 var(--font-mono); letter-spacing: 0.08em; color: rgba(236, 233, 226, 0.5); }
+.abs__form { max-width: 560px; }
+/* the page ends above the BMO chat button (fixed bottom-left), so CREDITS stays clickable */
+.abs__foot { padding: 32px 0 max(14svh, 180px); }
+@media (min-width: 761px) {
+  .abs__me { grid-template-columns: minmax(0, 0.9fr) minmax(0, 1.1fr); align-items: end; }
+  .abs__photo { max-height: 70svh; }
+}

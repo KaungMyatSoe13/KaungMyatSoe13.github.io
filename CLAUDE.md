@@ -449,6 +449,15 @@ notes are history, not instructions. Big-picture map: `src/content/*` (data) →
   project page keeps 0.5 room resolution and 2× pixel ratio there. The memory fixes stay for all.
   (Playwright WebKit reports maxTouchPoints 0: fake 5 with addInitScript to test it.)
 
+- About on phones and tablets is a STILL page (owner, 2026-11-27: the animated one glitched
+  there): `AboutSwitch` (src/app/about/page.tsx) renders `AboutStatic` on touch (`lightInk`) and
+  `AboutStory` on desktop. AboutStatic = the same content with no WebGL / TV / scroll or glitch
+  animation: the real photo, six skill cards (icons drawn once with AboutStory's exported
+  `drawIcon`), the tech logos as an SVG grid, a plain timeline, the form (mailto) + Credits.
+  Styles `.abs*` at the end of globals.css. The static HTML holds the still version; desktop
+  swaps to the animated one after hydration (the loader covers it). So everything above about
+  About's particles / TV on phones and tablets now applies to desktop only.
+
 ## Page switch (glitch)
 
 - `src/lib/tv.ts` + `TvLink.tsx` (names kept): showcase "About" and About "Selected work" play

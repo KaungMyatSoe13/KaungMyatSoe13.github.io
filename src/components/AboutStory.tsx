@@ -186,8 +186,9 @@ void main(){
 }`;
 
 
-/** Draw one step's icon in white on a 1000 x 720 canvas (chalky outlines and bars). */
-function drawIcon(g: CanvasRenderingContext2D, icon: SkillIcon) {
+/** Draw one step's icon in white on a 1000 x 720 canvas (chalky outlines and bars). Also used
+ *  by the still About page on phones / tablets (AboutStatic). */
+export function drawIcon(g: CanvasRenderingContext2D, icon: SkillIcon) {
   const W = 1000, H = 720;
   g.strokeStyle = g.fillStyle = "#fff"; g.lineCap = "round"; g.lineJoin = "round";
   const rr = (x: number, y: number, w: number, h: number, r: number, fill = false) => { g.beginPath(); g.roundRect(x, y, w, h, r); if (fill) g.fill(); else g.stroke(); };
