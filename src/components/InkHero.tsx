@@ -326,6 +326,10 @@ export default function InkHero({ arcade = false }: { arcade?: boolean }) {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const floodRef = useRef<HTMLDivElement>(null);
   const [live, setLive] = useState(false);
+  // phones / tablets: a note that the site is made for desktop (set after mount: the static
+  // HTML can't know the device)
+  const [touch, setTouch] = useState(false);
+  useEffect(() => { if (arcade) setTouch(lightInk()); }, [arcade]);
 
 
   useEffect(() => {
@@ -689,6 +693,12 @@ export default function InkHero({ arcade = false }: { arcade?: boolean }) {
         <a href="#work" className="hero-corner hero-corner--br">
           Scroll down
         </a>
+        {touch && (
+          <p className="desk-hint" role="note">
+            <b><span aria-hidden="true">▶ </span>Best on desktop</b>
+            <span>Open it on a computer for the full experience.</span>
+          </p>
+        )}
       </div>
     </section>
   );
