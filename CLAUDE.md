@@ -9,10 +9,10 @@ session opened in this folder. Keep it short and portfolio-only.
 
 ## What it is
 
-Two-screen personal site. 100vh ink "K" hero on paper, then the project list on a light
-paper page with a 12-column grid. Scroll timeline: the ink floods out of the K and covers
-the screen, drains away from the centre to reveal the grid page, then each project name
-crawls in from the side like a snake and settles into place.
+An arcade-themed personal portfolio: a light home page (3D Street Fighter arcade cabinet,
+floating game cards, ink flood into a project card wheel), a dark About page (particle portrait,
+one TV that falls through the page, contact form), five project pages with 3D rooms, an AI chat
+mascot (BMO) on every page, and webcam "Hand mode". First visit shows a 1 → 100 loader.
 
 - Owner: Kaung Myat Soe (personal, not OOm work)
 - Live: https://kaungmyatsoe13.github.io/
@@ -25,6 +25,39 @@ crawls in from the side like a snake and settles into place.
 - Tailwind v4, Inter Tight + JetBrains Mono from `next/font/google`
 - Hero is a WebGL2 fluid (ink) simulation, with an SVG fallback (see `src/components/InkHero.tsx`)
 - Deploys on every push to `main` via `.github/workflows/deploy.yml` (GitHub Pages)
+
+## Current state (2026-11-26) — read this first
+
+**Published** (live = `main` at 0eef1b2, built and deployed fine): the arcade site, music, loader,
+About TV story, 3D project rooms, and the Ask K chat (Worker deployed on Cloudflare).
+
+**Backed up but NOT published** (2026-11-27: committed and pushed to `origin/arcade-showcase`, not
+`main`; publish only when the owner says "publish"; the chat Worker's new spam protections are
+also not deployed; remove `DevReport` before publishing):
+- BMO as the chat button (`Bmo.tsx`, `public/ui/bmo.glb`), expressions, hover lines, one-line
+  footer with a Cloudflare "Privacy" link.
+- Hand mode (`HandMode.tsx`, `src/lib/hand.ts`, `public/mediapipe/` ~22 MB (the unused
+  `*_module_*` wasm pair and `vision_bundle.mjs` are git-ignored), npm `@mediapipe/tasks-vision`).
+- Never commit `public/projects/kotobalab/room.webp` (licence unconfirmed);
+  `public/hand-test/` is a git-ignored temporary test page (delete once Hand mode is approved).
+
+**Waiting on the owner:** testing Hand mode on a real webcam (tune the numbers at the top of
+`hand.ts`: pinch on/off, swipe speed, palm hold, smoothing; and the fist scroll gain in
+`HandMode.tsx`); filling the TODO lines in `src/content/assistant-facts.md` (availability,
+hobbies), then `npm run knowledge` and `cd worker && npm run deploy`.
+
+**How to publish:** commit (without room.webp), `git push origin arcade-showcase`, then
+`git push origin arcade-showcase:main`; watch with
+`GH_TOKEN=$(gh auth token -u KaungMyatSoe13) gh run watch ...` (the active `gh` account is the
+work one, don't switch it). The repo variable `NEXT_PUBLIC_CHAT_URL` is already set. If the
+Worker changed, deploy it separately (`wrangler` is logged in to the owner's Cloudflare).
+
+**Local dev:** `npx next dev` (webpack; `npm run dev`'s Turbopack has exited silently while
+compiling on this Mac). Add `NEXT_PUBLIC_CHAT_URL=https://ask-k.ask-k-worker.workers.dev` to see
+the chat. `npm run build` crashes on this Mac's Node (SIGSEGV) at times; GitHub's build is the check.
+
+**Owner style:** asks in short messages with screenshots; wants things tried in the browser and
+shown; likes arcade/retro touches; replies in the "Easy Read" output style.
 
 ## Home page structure (current)
 
@@ -156,9 +189,45 @@ notes are history, not instructions. Big-picture map: `src/content/*` (data) →
   SHARE list (the owner's phone is deliberately NOT in any file). Spam ceiling: Workers rate limit
   8/min/IP, KV daily cap (DAILY_CAP 400, ~12 neurons per message vs the 10,000/day free
   allowance), Turnstile bot check → signed 30-min pass (`x-ask-k-pass`), CORS to the site only,
-  600 chars / 10 turns. Button bottom-left (phones: the corner), CRT window, chips,
+  600 chars / 10 turns. Page-aware: AskK sends `page: { kind, project? }` (`whereNow`: project
+  page → its name; home showcase → the card in front, from `html[data-sc-active]` set by
+  ArcadeShowcase; about; home) and the Worker adds one checked "CURRENT PAGE" line (`pageLine`:
+  known kinds only, name must match a short plain pattern) so "this project" works. Mascot: BMO ("BMO" by linus1178, CC BY 4.0, `public/ui/bmo.glb`,
+  108 KB; credited) is the button (`Bmo.tsx`; no "ASK K" label any more, owner): floats bottom-left,
+  leans to the pointer; its face is repainted into the model's own texture (face box FACE, stored
+  flipped vertically): blinks, "..." while thinking, chatters while the answer streams, and an
+  EMOTION picked in AskK from the question (`feelQuestion`: private → secret wink + zipped mouth,
+  compliments → love hearts, greetings → excited, rude → sad with a tear, "really?" → surprised)
+  then from the answer (`feelAnswer`: errors → sad, "I don't know"/off-topic → confused "?",
+  else excited/happy), held ~5 s; dozes off (sleepy, z's) after a minute alone and wakes up
+  surprised; body language too (bounce, droop, tilt). says "Hi! Ask me about K" once per visit. BMO is Adventure
+  Time's character (IP): on the before-award list. (A "Sad toaster" mascot was CC BY-NC: skipped.)
+  Footer is ONE line "AI · can make mistakes · Privacy"; "Privacy" links straight to Cloudflare's
+  privacy policy (they run the model; owner's choice, no in-chat notice).
+  CRT window, chips,
   sessionStorage only. Hidden unless `NEXT_PUBLIC_CHAT_URL` is set (GitHub Actions repo
   variable). `worker/` is excluded from the site's tsconfig/eslint (it has its own).
+- Hand mode (`HandMode.tsx` + `src/lib/hand.ts`; owner saw adriangnzl.es): a "✋ HAND MODE" chip
+  bottom-right (hidden on touch-only devices) turns on the webcam; MediaPipe Tasks Vision
+  HandLandmarker runs in the browser (npm `@mediapipe/tasks-vision`, Apache-2.0, credited; wasm +
+  8 MB model self-hosted in `public/mediapipe/`, fetched only after the click; video never leaves
+  the device). Gestures → events the site already handles: point = `pointermove` (+ pointerover/
+  out for hover), ✌ peace sign (index + middle up, ring + little folded, held PEACE_MS 150) = one
+  click where the sign started (owner: not a quick pinch); pinch (thumb+index, 0.30 on / 0.45 off
+  of hand size) = the left button held down (drag, pointerup on release, never a click; dot red),
+  fist up/down = synthetic `wheel`; on the pinned home showcase (`html[data-sc-pinned]`) the fist
+  is a joystick instead (`fist()` in hand.ts: offset of the middle knuckle from where the fist
+  settled; past FIST_STEP = ArrowDown/Up, repeats every FIST_REPEAT while held; back to the middle
+  re-arms; no page scroll there). The cursor moves ONLY while pointing ☝ or pinching 🤏 (owner);
+  the open-hand flick (arrow keys) was removed; palm hold on About clicks its "Selected work"
+  link (back to the showcase). Showcase pin (all input, owner): once the showcase is reached,
+  any scroll up snaps back to it; only the K logo (unpins first) goes back to the landing.
+  Old fist-on-showcase problem: returning the fist stepped back / scrolled to the landing.
+  open-hand flick = ArrowLeft/Right keydown (cards / picture slider / viewer), open palm held 0.8 s =
+  click `.askk__close` / `.pd__viewer-close` / `.pd__close`. Esc or the chip turns it off and stops
+  the camera; H toggles it (not while typing). The mouse keeps working alongside it: `Cursor.tsx`
+  ignores untrusted (synthetic) pointer events, so its ring follows only the real mouse. Thresholds came from the test page (`public/hand-test/`, git-ignored, temporary) and
+  need tuning on the owner's real hand. CSS :hover doesn't fire from synthetic events.
 - `<html>`/`<body>` have `suppressHydrationWarning`: extensions like Grammarly add attributes.
 - Colours (owner removed the light/dark switch and its arcade button; they are in git history):
   the HOME page (landing + showcase) is LIGHT paper; About, project pages, the loader and the
@@ -300,6 +369,70 @@ notes are history, not instructions. Big-picture map: `src/content/*` (data) →
   `/#work` targets `.work-anchor` after the hero. Showcase progress uses scrollY.
 - Landing (`InkHero` RENDER shader) also has the curved-TV look: barrel warp, curved
   tear bands + rolling band, pixel-aligned scanlines (avoid moiré), grain, vignette.
+
+## Phones and tablets (2026-11-26 pass)
+
+- Portrait tablets (≤1100px, portrait) use the PHONE layouts: home showcase framing
+  (`phone` in ArcadeShowcase), About (01) stacked, "What I do" text on top, Contact stacked
+  (and `formY` in AboutStory). CSS: `@media (max-width: 760px), (max-width: 1100px) and (orientation: portrait)`.
+- Project page: ≤1200px three columns + thumbnails on their own centred row, "Next project" under
+  the top bar; portrait tablets two columns; phones compact one column, no thumbnails (swipe).
+- About header has a dark fade (`.ab__top::before`) so text never runs into the logo; the
+  timeline text has a dark text-shadow (white TV model behind it).
+- Hand mode: desktop only (≥1025px, fine pointer, no coarse pointer, maxTouchPoints < 2).
+- Checked with Playwright screenshots at 390×844, 820×1180, 1180×820: no sideways overflow.
+- Second pass (owner's iPhone/iPad simulator shots), checked in Playwright WebKit (iPhone 15, iPhone SE,
+  iPad Pro 11 both ways): home sizes use `lvh` (Safari's full height; svh left a strip above the
+  showcase when the toolbar hid); phone showcase framing lowered (fy 0.45, screen 50% wide) so the
+  menu row clears the marquee. About portrait canvas is ALWAYS full screen (a 70svh canvas cut the
+  particles flat and misplaced the year/TV targets); the figure is placed inside it (`phoneFig`:
+  phones stand it on y = -0.4, tablets/desktop on the bottom edge); year targets use the canvas rect.
+  Contact: phones/portrait tablets/short screens get a compact form so the TV + whole form fit the
+  last screen (short phones tighter still); Credits stays above BMO. Project page on phones: the
+  middle screen fits the measured free band between "Next project" and the text (`band` in
+  ProjectDetail, re-measured every 0.6 s); tablets: info padded clear of BMO.
+- Third pass: phones/tablets (narrow, `!wide` in AboutTv): the "What I do" TV fits the measured band
+  between the step text and the tabs; it LEAVES while falling through Experience (no room beside the
+  text) and comes back for the landing in Contact. Phones: the sticky year is a faint watermark
+  (opacity 0.4, behind the timeline, no black block, `yearDim` dims the stage particles to match).
+  Phones/tablets render the showcase at ≤1.5× pixel ratio. `allowedDevOrigins` in next.config lets a
+  phone on the same Wi-Fi open the dev server (http://<Mac IP>:3000) for real-device tests.
+- Real-iPhone fixes (owner: no ink flood on a real iPhone, fine in the simulator): touch devices
+  (`lightInk()` in stage.ts: coarse pointer or maxTouchPoints > 1) skip InkHero's fluid sim entirely;
+  ArcadeShowcase's POST shader draws the same flood/drain shapes itself (`anaInk`, uAna/uP/uQ/uOrigin;
+  the desktop path copies the ink canvas into a texture every frame, which real iOS Safari does
+  badly). Card wheel on touch follows the finger (`touch` in ArcadeShowcase: STEP_PX per card,
+  release snaps with a flick carry of up to 2, swipe speed spins the cards; touches no longer start
+  the single-card spin drag). `DevReport.tsx` (root layout) sends errors/FPS to a log receiver on
+  the Mac (port 3999) ONLY when the site is opened from a local-network IP: remove before publishing
+  if not wanted.
+- Real-iPhone log (iOS 27, 440×756 @3x): no JS errors; home 42–52 fps, projects ~60, About froze
+  8.3 s on first showing the TV (shader compile on iOS). Fixes: AboutTv `renderer.compileAsync`
+  before the loader lets go; touch devices skip the three fall SHELLS (TV hides during the fall
+  there anyway; lands as the main TV); phones sample the portrait 320 wide (~half the particles).
+  Touch devices: showcase cards always face front (no spin/tilt, they only slide). Galleries now
+  start with the `preview.mp4` clips (after the cover); gallery videos are appended to the page
+  invisibly and started muted (iOS only loads/plays videos that are in the page).
+- Phones/tablets pass 5: tech stack row scaled (`sizeK` in StackCarousel: phones 0.55, tablets / touch
+  0.72; shorter row). Project opening waits for its pictures AND the 3D room (max 4.5 s, never
+  forever; `decoded()` falls back from img.decode() to onload, iOS can reject decode for the big
+  in-memory home still: that used to leave the page stuck on the zoomed home screen). HomeTv jumps
+  to the bottom again at 300/700 ms (the router's #work jump landed short on phones, unpinned).
+  The phone test build needs NEXT_PUBLIC_CHAT_URL for BMO to show (the Worker only allows
+  localhost:3000 and the live site, so chat replies fail from a LAN address).
+- Pass 6: About on touch: no pointer interaction (portrait lens/smear, year smear, turn, stack nudge;
+  `touchUI()`); canvases measure against `stableH()` (Safari's full height: the toolbar hiding on
+  the first scroll shifted every particle up and back); resize only rebuilds year/form when the
+  width or the height really changes. Phones/portrait tablets: tighter section gaps (stack, exp,
+  timeline items, contact min-height 0).
+- Chat security (Worker): `screen()` answers rule-changing attempts / off-topic jobs (only as
+  requests to the bot, so questions ABOUT K pass) / junk / repeats WITHOUT calling the model;
+  two such answers in a conversation → it stops (PAUSED); IP_DAILY 30 messages per hashed IP a day
+  (KV, 2-day TTL); max_tokens 220. Site: 2.5 s between messages, 20 per visit. Turnstile is still
+  optional (needs the owner to create a widget in the Cloudflare dashboard).
+- Phone/tablet section gaps: the rules are prefixed `.ab ` (the base rules come LATER in globals.css
+  and won), `.ab__stack` pulls up into the tabs' empty BMO room (-170px / phones -88px), fixed row
+  heights (150 / 118px), last timeline item has no min-height.
 
 ## Page switch (glitch)
 
@@ -450,6 +583,14 @@ the ffmpeg and cwebp commands.
   baked: fixes thousands of meshes/draw calls), `--ratio/--error/--min-tris` (meshoptimizer
   simplify; after a merge keep `--error` small, it is relative to the whole merged mesh, or
   small objects vanish), `--drop-tangents`.
+- "NEXT PROJECT ▸ / <name>" (`.pd__next`, bottom right above the Hand mode chip; phones: under
+  the top bar; loops) = TvLink glitch switch to the
+  next project; ProjectDetail calls `tvOn` in a layout effect and the route page keys it by slug.
+  About `.ab__contact-foot` bottom padding max(16svh, 220px) keeps CREDITS above the fixed BMO.
+- Project `context` (yellow tag under the name: who / why, e.g. "Solo · personal tool") and
+  `story` (why it exists, owner's own reasons, sentence case under the summary) in projects.ts.
+  Work numbers (owner, 2026-11): 50+ info/e-commerce sites, custom plugins on 50+ client sites,
+  AI automation for internal workflows: company work, can't be shown or named.
 - HUD (owner: was hard to read over the dark rooms): dark gradient bands top and bottom
   (`.pd::before/::after`), yellow labels, text shadow. "Role" became "Built with" (the `stack`
   list; `role` in projects.ts is no longer shown). The 3D background's credit moved off the
@@ -473,7 +614,7 @@ the ffmpeg and cwebp commands.
 
 - (Superseded: `/about` now exists, see "About page" above.)
 - Before an award submission (owner's plan, not yet): the real game covers on the landing
-  cards, the Street Fighter art on the arcade cabinet and the Street Fighter II music are
+  cards, the Street Fighter art on the arcade cabinet, the BMO chat mascot and the Street Fighter II music are
   Capcom's / the publishers' IP; swap them then (painted covers: drop `cover` in
   arcadeGames.ts; a different cabinet model; royalty-free chiptune in `public/audio/`).
 - PeakFit has no live/code link (the old site had none either). Don't invent one.
@@ -514,7 +655,10 @@ python3 -m http.server 4310 --bind 127.0.0.1 --directory out
 
 ## Open work
 
-- Project inner pages (per-project detail route).
+- Tune and publish Hand mode and the BMO chat changes (see "Current state").
+- Optional: Cloudflare Turnstile for the chat (README → "Ask K assistant"); shrink
+  `public/about/tv-television.glb` (5.3 → ~2 MB with `scripts/shrink-glb.cjs`).
+- PeakFit gallery "videos" are still images: needs the real .mp4 files from the owner.
+- Before any award submission: swap the third-party IP (see "What's intentionally not here").
 - Point `kfolio.online` at the Pages site.
-- Review the written copy in `site.ts` and each project's `summary` — these were
-  drafted and not yet confirmed by the owner.
+- Review the written copy in `site.ts` and each project's `summary` (drafted, not confirmed).

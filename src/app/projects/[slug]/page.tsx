@@ -21,5 +21,5 @@ export default async function ProjectPage({ params }: { params: Promise<{ slug: 
   const { slug } = await params;
   const index = projects.findIndex((x) => x.slug === slug);
   if (index < 0) notFound();
-  return <ProjectDetail index={index} />;
+  return <ProjectDetail key={slug} index={index} />;
 }

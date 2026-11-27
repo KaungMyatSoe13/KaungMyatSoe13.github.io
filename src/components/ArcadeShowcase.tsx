@@ -8,7 +8,7 @@ import { RETURN_KEY } from "./ProjectDetail";
 import { BEND, CARD_KEY, GRID, lensInv } from "@/lib/cardGrid";
 import { homeShot, homeShotMouse, setHomeShot } from "@/lib/snapshot";
 import { drawKFace, drawScreenFace } from "@/lib/screenFace";
-import { floodOrigin, snap } from "@/lib/stage";
+import { floodOrigin, lightInk, snap } from "@/lib/stage";
 import { LABEL, TEX, drawCardLabel, projectCard } from "@/lib/cardLabel";
 import { arcadeGames } from "@/content/arcadeGames";
 import { drawGameArt } from "@/lib/gameArt";
@@ -53,10 +53,26 @@ uniform vec3 uPaper, uTextCol, uEdgeCol;   // the paper, the faint drifting text
 uniform float uT, uAspect, uClean, uBend, uDrift, uKick, uOver;
 uniform sampler2D tCards;          // the game cards: drawn flat over the bent scene
 uniform sampler2D tInk; uniform float uInk;   // the home page's ink, behind the arcade
+uniform float uAna, uP, uQ; uniform vec2 uOrigin;  // phones / tablets: the same flood drawn here (no sim)
 uniform sampler2D tBack;           // cards with 90s arcade games floating behind everything
 float hash(vec2 p){ return fract(sin(dot(p, vec2(127.1, 311.7))) * 43758.5453); }
 float noise(vec2 p){ vec2 i = floor(p), f = fract(p); vec2 u = f * f * (3.0 - 2.0 * f);
   return mix(mix(hash(i), hash(i + vec2(1, 0)), u.x), mix(hash(i + vec2(0, 1)), hash(i + vec2(1, 1)), u.x), u.y); }
+float fbm(vec2 p){ float s = 0.0, a = 0.5; for (int i = 0; i < 5; i++) { s += a * noise(p); p *= 2.03; a *= 0.5; } return s; }
+// the ink's flood and drain (InkHero's shapes, without its fluid): ragged fronts from uOrigin
+float anaInk(vec2 uv){
+  vec2 q2 = vec2(uv.x * uAspect, uv.y);
+  vec2 w = vec2(fbm(q2 * 2.2 + uT * 0.04), fbm(q2 * 2.2 + 9.1 - uT * 0.04)) - 0.5;
+  float n = fbm(q2 * 3.4 + w * 2.0 + vec2(3.7, uT * 0.015));
+  float d = length(q2 - vec2(uOrigin.x * uAspect, uOrigin.y)) / length(vec2(0.5 * uAspect, 0.5));
+  float front = pow(uP, 1.6) * 1.5 - d - 0.06 + (n - 0.5) * 0.5 * smoothstep(0.0, 0.25, uP);
+  float lv = 0.5 + front * 2.5, aa = fwidth(lv) + 0.0015;
+  float ink = smoothstep(0.5 - aa, 0.5 + aa, lv) * smoothstep(0.0, 0.05, uP);
+  float n2 = fbm(q2 * 3.1 + w * 2.0 + vec2(11.3, -uT * 0.015));
+  float back = pow(uQ, 1.6) * 1.5 - d - 0.02 + (n2 - 0.5) * 0.5 * smoothstep(0.0, 0.25, uQ);
+  float lv2 = 0.5 + back * 2.5, aa2 = fwidth(lv2) + 0.0015;
+  return ink * (1.0 - smoothstep(0.5 - aa2, 0.5 + aa2, lv2));
+}
 vec2 lensFwd(vec2 q, float k){ float r2 = dot(q, q); return q * (1.0 + k * r2 + 0.11 * (k / ${BEND.toFixed(3)}) * r2 * r2); }  // flat when k = 0
 vec3 lin(vec3 c){ return pow(c, vec3(2.2)); }
 vec4 sceneAt(vec2 s){
@@ -87,7 +103,7 @@ void main(){
   vec4 kbk = texture(tBack, cuv);
   bg = bg * (1.0 - kbk.a) + kbk.rgb * 0.9;           // a little faded into the paper
   // the ink floods the page behind the arcade (it has its own TV curve already)
-  vec4 ik = texture(tInk, vUv);
+  vec4 ik = uAna > 0.5 ? vec4(0.055, 0.055, 0.055, anaInk(vUv)) : texture(tInk, vUv);
   float ia = ik.a * uInk;
   bg = mix(bg, lin(ik.rgb), ia);
   float ca = (0.002 + uKick * 0.006) * (0.4 + length(q)) * calm;
@@ -297,9 +313,16 @@ export default function ArcadeShowcase() {
   const sectionRef = useRef<HTMLElement>(null);
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const targetRef = useRef(0);
+  /** Once the showcase is reached, the page stays on it: only the logo goes back to the landing. */
+  const pinRef = useRef(false);
   const exitRef = useRef<{ row: number; t: number } | null>(null);
   const goRef = useRef<(() => void) | null>(null);
   const [active, setActive] = useState(0);
+  // for the Ask K chat: which project card is in front ("this project" on the home page)
+  useEffect(() => {
+    document.documentElement.dataset.scActive = projects[active].name;
+    return () => { delete document.documentElement.dataset.scActive; };
+  }, [active]);
   const glOk = useRef(false);
   const router = useRouter();
 
@@ -391,15 +414,38 @@ export default function ArcadeShowcase() {
       if (Math.abs(acc) > PUSH) { step(Math.sign(acc)); acc = 0; locked = true; steppedAt = performance.now(); peak = ady; }
     };
     const dragState = { on: false };
-    let touchY = 0, touchX = 0, touchDone = false;
-    const onTouchStart = (e: TouchEvent) => { touchY = e.touches[0].clientY; touchX = e.touches[0].clientX; touchDone = false; };
+    // Touch: the wheel follows the finger (cards slide along and spin with the swipe's speed),
+    // then snaps to the nearest card on release; a quick flick carries on a little further.
+    const touch = { on: false, x: 0, y: 0, base: 0, axis: 0, lastD: 0, lastT: 0, v: 0 };
+    const swipeSpin = { v: 0 };                                     // read (and cleared) by the frame loop
+    const STEP_PX = () => Math.max(120, Math.min(innerWidth, innerHeight) * 0.42);
+    const onTouchStart = (e: TouchEvent) => {
+      touch.on = atBottom(); touch.x = e.touches[0].clientX; touch.y = e.touches[0].clientY;
+      touch.base = targetRef.current; touch.axis = 0; touch.lastD = 0; touch.lastT = e.timeStamp; touch.v = 0;
+    };
     const onTouchMove = (e: TouchEvent) => {
-      if (!atBottom() || dragState.on) return;
-      if (touchDone) { e.preventDefault(); return; }                         // one step per swipe
-      const y = e.touches[0].clientY, x = e.touches[0].clientX;
+      if (!touch.on || !atBottom() || dragState.on) return;
+      const dx = touch.x - e.touches[0].clientX, dy = touch.y - e.touches[0].clientY;
+      if (!touch.axis && Math.hypot(dx, dy) > 8) touch.axis = Math.abs(dx) > Math.abs(dy) ? 1 : 2;
+      if (!touch.axis) return;
       e.preventDefault();
-      const d = Math.abs(touchY - y) > Math.abs(touchX - x) ? touchY - y : touchX - x;
-      if (Math.abs(d) > 50) { step(Math.sign(d)); touchDone = true; }
+      const d = touch.axis === 1 ? dx : dy;
+      const dt = Math.max(1, e.timeStamp - touch.lastT);
+      touch.v = touch.v * 0.6 + ((d - touch.lastD) / dt) * 0.4;     // px per ms, smoothed
+      swipeSpin.v += d - touch.lastD;
+      touch.lastD = d; touch.lastT = e.timeStamp;
+      const before = Math.round(targetRef.current);
+      targetRef.current = touch.base + d / STEP_PX();
+      if (Math.round(targetRef.current) !== before) music.tick();   // the ratchet as each card passes
+    };
+    const onTouchEnd = () => {
+      if (!touch.on || !touch.axis) { touch.on = false; return; }
+      touch.on = false;
+      // flick: carry on with the release speed, at most two cards further
+      const carry = Math.max(-2, Math.min(2, (touch.v * 260) / STEP_PX()));
+      const to = Math.round(targetRef.current + carry);
+      if (to !== Math.round(targetRef.current)) music.tick();
+      targetRef.current = to;
     };
     const onKey = (e: KeyboardEvent) => {
       if (!atBottom()) return;
@@ -407,9 +453,22 @@ export default function ArcadeShowcase() {
       if (e.key === "ArrowUp" || e.key === "ArrowLeft") { step(-1); e.preventDefault(); }
       if (e.key === "Enter" && document.activeElement === document.body) open(activeRef.current);
     };
+    // Pinned: once the showcase fills the screen, nothing scrolls back up to the landing (wheel,
+    // keys, scrollbar, Hand mode's fist); the logo's click unpins first. `data-sc-pinned` on <html>
+    // tells Hand mode to use the fist as a card joystick here.
+    const html = document.documentElement;
+    const pin = (on: boolean) => { pinRef.current = on; html.toggleAttribute("data-sc-pinned", on); };
+    const onScroll = () => {
+      if (atBottom()) { if (!pinRef.current) pin(true); }
+      else if (pinRef.current) window.scrollTo({ top: document.documentElement.scrollHeight, behavior: "instant" as ScrollBehavior });
+    };
+    window.addEventListener("scroll", onScroll, { passive: true });
+    onScroll();
     window.addEventListener("wheel", onWheel, { passive: false });
     section.addEventListener("touchstart", onTouchStart, { passive: true });
     section.addEventListener("touchmove", onTouchMove, { passive: false });
+    section.addEventListener("touchend", onTouchEnd, { passive: true });
+    section.addEventListener("touchcancel", onTouchEnd, { passive: true });
     window.addEventListener("keydown", onKey);
 
     // back from a project page: start on it, same pointer, no glitch
@@ -661,7 +720,8 @@ export default function ArcadeShowcase() {
         }
       }
       // the ink hero's canvas (hidden in arcade mode), read as a texture each frame
-      const inkCanvas = document.querySelector<HTMLCanvasElement>(".ink-hero[data-arcade] .ink-canvas");
+      const ana = lightInk();                                     // phones / tablets: the flood is drawn here
+      const inkCanvas = ana ? null : document.querySelector<HTMLCanvasElement>(".ink-hero[data-arcade] .ink-canvas");
       const inkTex = inkCanvas ? new THREE.CanvasTexture(inkCanvas) : new THREE.Texture();
       inkTex.colorSpace = THREE.SRGBColorSpace;
       const ttex = new THREE.CanvasTexture(bc);
@@ -669,7 +729,7 @@ export default function ArcadeShowcase() {
       const post = new THREE.ShaderMaterial({
         glslVersion: THREE.GLSL3, vertexShader: POST_VS, fragmentShader: POST_FS, depthTest: false, depthWrite: false,
         uniforms: {
-          tScene: { value: rt.texture }, tCards: { value: rtC.texture }, tBack: { value: rtB.texture }, tInk: { value: inkTex }, uInk: { value: 0 }, tText: { value: ttex }, uPaper: { value: new THREE.Vector3(0.949, 0.937, 0.914) }, uTextCol: { value: new THREE.Vector3(0.62, 0.62, 0.62) }, uEdgeCol: { value: new THREE.Vector3(1, 1, 1) },
+          tScene: { value: rt.texture }, tCards: { value: rtC.texture }, tBack: { value: rtB.texture }, tInk: { value: inkTex }, uInk: { value: 0 }, uAna: { value: ana ? 1 : 0 }, uP: { value: 0 }, uQ: { value: 0 }, uOrigin: { value: new THREE.Vector2(0.5, 0.5) }, tText: { value: ttex }, uPaper: { value: new THREE.Vector3(0.949, 0.937, 0.914) }, uTextCol: { value: new THREE.Vector3(0.62, 0.62, 0.62) }, uEdgeCol: { value: new THREE.Vector3(1, 1, 1) },
           uT: { value: 0 }, uAspect: { value: 1 }, uClean: { value: 0 }, uBend: { value: BEND }, uDrift: { value: 0 }, uKick: { value: 0 }, uOver: { value: OVER },
         },
       });
@@ -681,7 +741,7 @@ export default function ArcadeShowcase() {
       let aspect = 1, phone = false, sized = "";
       const CARD_D = 6;
       const fit = () => {
-        const dpr = Math.min(devicePixelRatio || 1, 2);
+        const dpr = Math.min(devicePixelRatio || 1, innerWidth <= 1100 ? 1.5 : 2);   // phones / tablets: lighter
         const w = canvas.clientWidth, h = canvas.clientHeight;
         // resizing a canvas clears it (even to the same size): only when it really changed
         if (sized === `${w}x${h}x${dpr}`) return;
@@ -692,7 +752,7 @@ export default function ArcadeShowcase() {
         rt.setSize(Math.round(w * k), Math.round(h * k));
         rtC.setSize(Math.round(w * dpr), Math.round(h * dpr));
         rtB.setSize(Math.round(w * dpr), Math.round(h * dpr));
-        aspect = w / Math.max(1, h); phone = w <= 760;
+        aspect = w / Math.max(1, h); phone = w <= 760 || (w <= 1100 && h > w);   // portrait tablets too
         camera.aspect = aspect; ccam.aspect = aspect; bcam.aspect = aspect;
         camera.zoom = 1 / OVER;
         ccam.updateProjectionMatrix(); bcam.updateProjectionMatrix();
@@ -719,7 +779,7 @@ export default function ArcadeShowcase() {
         lastE = e; lastDv = dv;
         const w = canvas.clientWidth, h = canvas.clientHeight;
         const dA = phone ? Math.max(allSize.y / (0.66 * vis), allSize.x * 1.7 / (0.8 * vis * aspect)) : allSize.y / (0.8 * vis);
-        const dB = phone ? 1 / (0.56 * vis * aspect) : SCR_H / (0.3 * vis);
+        const dB = phone ? 1 / (0.5 * vis * aspect) : SCR_H / (0.3 * vis);
         const dD = Math.min(SCR_H, 1 / aspect) / (vis * OVER) * 1.16;  // the screen just fills the view
         let yaw = 0.45 + (-0.5 - 0.45) * e, pitch = 0.08 + (0.16 - 0.08) * e;
         let d = dA * Math.pow(dB / dA, e);                        // distance changes evenly in log
@@ -729,7 +789,7 @@ export default function ArcadeShowcase() {
         tgt.multiplyScalar(1 - dv);                               // → the screen's centre (0, 0, 0)
         camera.position.set(Math.sin(yaw) * d * Math.cos(pitch), Math.sin(pitch) * d, Math.cos(yaw) * d * Math.cos(pitch)).add(tgt);
         camera.lookAt(tgt);
-        let fx = 0.5 + ((phone ? 0.5 : 0.37) - 0.5) * e, fy = 0.5 + ((phone ? 0.34 : 0.5) - 0.5) * e;
+        let fx = 0.5 + ((phone ? 0.5 : 0.37) - 0.5) * e, fy = 0.5 + ((phone ? 0.45 : 0.5) - 0.5) * e;   // phones: the marquee clears the menu row
         fx += (0.5 - fx) * dv; fy += (0.5 - fy) * dv;
         // (offsets are a share of the wider, zoomed-out view)
         camera.setViewOffset(w, h, ((0.5 - fx) * w) / OVER, ((0.5 - fy) * h) / OVER, w, h);
@@ -797,6 +857,7 @@ export default function ArcadeShowcase() {
       const spin = projects.map(() => ({ yaw: 0, pitch: 0, vy: 0, vp: 0 }));
       let drag: { i: number; x: number; y: number; moved: number } | null = null, dragMoved = 0;
       const onDown = (e: PointerEvent) => {
+        if (e.pointerType === "touch") return;                    // touch: the swipe turns the wheel instead
         const h = pick(e.clientX, e.clientY);
         if (!h || !("card" in h)) return;
         drag = { i: h.card, x: e.clientX, y: e.clientY, moved: 0 };
@@ -887,7 +948,7 @@ export default function ArcadeShowcase() {
         // the screen: the K on the landing, the project once the camera has turned
         const want = ps < 0.52 ? "K" : String(shown);
         if (want !== scrKey) { if (scrKey) { prevKey = scrKey; changedAt = now; } scrKey = want; }
-        cur += (targetRef.current - cur) * (reduced ? 1 : 1 - Math.exp(-dt * 7));
+        cur += (targetRef.current - cur) * (reduced ? 1 : 1 - Math.exp(-dt * (touch.on ? 14 : 7)));   // follows a finger closely
         const since = (now - changedAt) / 1000;
         const glitch = reduced ? 0 : Math.max(0, 1 - since / CHANGE_S);
         const ex = exNow;
@@ -930,6 +991,7 @@ export default function ArcadeShowcase() {
           order.forEach(([, i], k) => { if (back || reduced) { fall[i] = 1; lift[i] = 0; } else fall[i] = now + k * 85; });
         }
         if (!down && ps < 0.6) fall.fill(-1);
+        const swipePx = swipeSpin.v; swipeSpin.v = 0;              // finger movement since last frame
         for (const m of cards) {
           const i = m.userData.i as number;
           const d = near(i, cur) - cur;
@@ -955,6 +1017,9 @@ export default function ArcadeShowcase() {
           m.position.set(p.x + mx * 0.05 + dv * dv * hh * aspect * 2.2, p.y + my * 0.04 + off * hh * 2.8, p.z);
           m.scale.setScalar(p.s);
           const sp = spin[i];
+          // phones / tablets: the cards always face you (they slide with a swipe, never spin)
+          if (ana) { sp.yaw = sp.pitch = sp.vy = sp.vp = 0; }
+          else if (swipePx) sp.vy += -swipePx * 0.0016 * (1 - Math.min(1, Math.abs(d) * 0.4));
           if (!drag || drag.i !== i) {
             sp.yaw += sp.vy; sp.pitch += sp.vp; sp.vy *= 0.93; sp.vp *= 0.9;
             // once it leaves the front, it turns back to face you (the short way round)
@@ -963,7 +1028,8 @@ export default function ArcadeShowcase() {
               sp.yaw += (hy - sp.yaw) * 0.08; sp.pitch += (hp - sp.pitch) * 0.08;
             }
           }
-          m.rotation.set(-my * 0.12 + (reduced ? 0 : Math.sin(t * 0.8 + i) * 0.03) + sp.pitch + tilt * 0.6, p.ry + mx * 0.15 + sp.yaw, p.rz + tilt, "YXZ");
+          if (ana) m.rotation.set(tilt * 0.6, p.ry, p.rz + tilt, "YXZ");
+          else m.rotation.set(-my * 0.12 + (reduced ? 0 : Math.sin(t * 0.8 + i) * 0.03) + sp.pitch + tilt * 0.6, p.ry + mx * 0.15 + sp.yaw, p.rz + tilt, "YXZ");
           const mat = m.material as import("three").MeshStandardMaterial;
           mat.color.setScalar(0.62 + 0.38 * p.focus);
           const fx = mat.userData.fx as { uHover: { value: number }; uTime: { value: number }; uBurst: { value: number }; at: number; on: boolean };
@@ -1020,6 +1086,13 @@ export default function ArcadeShowcase() {
         const inkOn = !!inkCanvas && (p < 0.66 || ps < 0.66) && inkCanvas.width > 2;
         if (inkOn) inkTex.needsUpdate = true;
         post.uniforms.uInk.value = inkOn ? 1 : 0;
+        if (ana) {
+          // InkHero's timeline: flood 0 → 0.35, drain 0.38 → 0.62 of the first screen
+          post.uniforms.uInk.value = ps < 0.66 ? 1 : 0;
+          post.uniforms.uP.value = Math.min(1, Math.max(0, ps / 0.35));
+          post.uniforms.uQ.value = Math.min(1, Math.max(0, (ps - 0.38) / 0.24));
+          post.uniforms.uOrigin.value.set(floodOrigin.x, floodOrigin.y);
+        }
         post.uniforms.uT.value = t;
         post.uniforms.uDrift.value = t * 0.004;
         post.uniforms.uKick.value = ex ? shake * 1.4 : Math.max(glitch * 0.6, hit * 0.45);
@@ -1053,7 +1126,11 @@ export default function ArcadeShowcase() {
       window.removeEventListener("wheel", onWheel);
       section.removeEventListener("touchstart", onTouchStart);
       section.removeEventListener("touchmove", onTouchMove);
+      section.removeEventListener("touchend", onTouchEnd);
+      section.removeEventListener("touchcancel", onTouchEnd);
       window.removeEventListener("keydown", onKey);
+      window.removeEventListener("scroll", onScroll);
+      pin(false);
       window.removeEventListener("pointermove", onPointer);
       document.documentElement.removeEventListener("pointerleave", onLeave);
     };
@@ -1077,6 +1154,7 @@ export default function ArcadeShowcase() {
           onClick={(e) => {
             // a glitch cut to the landing, not the whole scroll animation backwards
             e.preventDefault();
+            pinRef.current = false; document.documentElement.removeAttribute("data-sc-pinned");
             glitchJump(() => window.scrollTo({ top: 0, behavior: "instant" as ScrollBehavior }));
           }}
         >

@@ -3,6 +3,7 @@
 import { useEffect, useRef } from "react";
 import { skills } from "@/content/about";
 import { loadShell, loadTv, type Shell } from "@/lib/tvModel";
+import { lightInk } from "@/lib/stage";
 import { aboutTv } from "@/lib/aboutTv";
 import { bytes, loading } from "@/lib/loading";
 
@@ -86,18 +87,24 @@ export default function AboutTv({ turn }: { turn: { x: number; y: number } }) {
       const mono = getComputedStyle(document.body).getPropertyValue("--font-mono").trim() || "monospace";
 
       const tv = await loadTv(THREE, tex, bytes(ld));
-      ld(1);
       if (!alive) { renderer.dispose(); return; }
       host.appendChild(renderer.domElement);
       const rig = new THREE.Group(); scene.add(rig);
       rig.add(tv.model);
+      // prepare its shaders now, while the loading counter is up: compiling them on the first
+      // frame it shows froze phones for seconds mid-scroll
+      try { await renderer.compileAsync(scene, camera); } catch {}
+      ld(1);
+      if (!alive) { renderer.dispose(); return; }
       // the others it turns into while it falls (loaded a little later; it stays the main TV
       // until they are in). Their screens play the same picture through a second texture.
       const tex2 = new THREE.CanvasTexture(sc);
       tex2.colorSpace = THREE.SRGBColorSpace;
       const models: (import("three").Object3D | null)[] = [tv.model, ...SHELLS.map(() => null)];
       const scrMats: import("three").MeshBasicMaterial[] = [];
-      const later = window.setTimeout(() => SHELLS.forEach((sh, i) => {
+      // (phones / tablets: not at all. The TV leaves during the fall there, and three more
+      // models to download, parse and compile cost a phone seconds)
+      const later = lightInk() ? 0 : window.setTimeout(() => SHELLS.forEach((sh, i) => {
         loadShell(THREE, sh, tex2, tv.aspect).then((m) => {
           if (!alive) return;
           m.visible = false; rig.add(m); models[i + 1] = m;
@@ -257,6 +264,7 @@ export default function AboutTv({ turn }: { turn: { x: number; y: number } }) {
       const scrMat = tv.screen?.material as import("three").MeshBasicMaterial | undefined;
       let raf = 0, last = 0, lastNow = performance.now();
       const t0 = performance.now();
+      let bandAt = -1e9, band: [number, number] = [0, 0], awayDone = false;
       const frame = (now: number) => {
         raf = requestAnimationFrame(frame);
         const t = (now - t0) / 1000, dt = Math.min(0.05, (now - lastNow) / 1000); lastNow = now;
@@ -277,8 +285,19 @@ export default function AboutTv({ turn }: { turn: { x: number; y: number } }) {
 
         // "What I do": right half (phones: lower middle), waiting in the section: it scrolls in
         // with it, then stays while the section is pinned
-        const hA = wide ? Math.min(H * 0.46, (W * 0.34) / asp) : Math.min(H * 0.3, (W * 0.7) / asp);
-        const cxA = wide ? W * 0.76 : W * 0.5, cyA = (wide ? H * 0.5 : H * 0.62) + Math.max(0, T2 - sy);
+        // narrow screens: in the free band between the step's text and the tabs (measured on the
+        // pinned stage, so it never covers either)
+        if (!wide && doSec && now - bandAt > 400) {
+          bandAt = now;
+          const pin = doSec.querySelector<HTMLElement>(".ab__do-pin"), tx = doSec.querySelector<HTMLElement>(".ab__do-text"), tb = doSec.querySelector<HTMLElement>(".ab__do-tabs");
+          if (pin && tx && tb) {
+            const pr = pin.getBoundingClientRect().top;
+            band = [tx.getBoundingClientRect().bottom - pr + 16, tb.getBoundingClientRect().top - pr - 16];
+          }
+        }
+        const bandH = band[1] - band[0];
+        const hA = wide ? Math.min(H * 0.46, (W * 0.34) / asp) : Math.min(H * 0.3, (W * 0.7) / asp, bandH > 60 ? bandH * 0.92 : 1e9);
+        const cxA = wide ? W * 0.76 : W * 0.5, cyA = (wide ? H * 0.5 : bandH > 60 ? (band[0] + band[1]) / 2 : H * 0.62) + Math.max(0, T2 - sy);
         const sway = reduced ? 0 : Math.sin(t * 0.5);
         const yawA = -0.22 + sway * 0.05 + turn.x * 0.12, pitchA = 0.05 - turn.y * 0.05;
         let cx = cxA, cy = cyA, h = hA, sx = 1, syc = 1, dim = 1;
@@ -380,6 +399,14 @@ export default function AboutTv({ turn }: { turn: { x: number; y: number } }) {
           });
           aboutTv.ready = true;
         }
+        // narrow screens: no room beside the Experience text, so it leaves while it falls (a
+        // glitch out) and comes back for the landing in Contact
+        const away = !wide && !reduced && f > 0.06 && p < 0.03;
+        if (away) {
+          if (!awayDone) { renderer.clear(); host.style.filter = ""; awayDone = true; }
+          return;
+        }
+        awayDone = false;
         // draw only while some of it can be on screen
         const reach = h * 1.2;
         if (cy - reach > H || cy + reach < 0) return;

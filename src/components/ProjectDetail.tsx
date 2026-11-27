@@ -4,6 +4,8 @@ import { drawScreenFace } from "@/lib/screenFace";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useEffect, useLayoutEffect, useRef, useState } from "react";
+import TvLink from "./TvLink";
+import { tvOn } from "@/lib/tv";
 import { projects } from "@/content/projects";
 import { site } from "@/content/site";
 import { particlesReady } from "@/lib/scatter";
@@ -191,6 +193,13 @@ function program(gl: WebGL2RenderingContext, vs: string, fs: string, attrs: stri
 
 /** Gallery entries can be videos: they play while they are the picture in front. */
 const isVideo = (src: string) => /\.(mp4|webm|mov)$/i.test(src);
+/** An image ready to draw: decode() where it works, plain onload where it fails (iOS can reject
+ *  decode() for big in-memory pictures). Rejects only if the image itself can't load. */
+const decoded = (im: HTMLImageElement) =>
+  im.decode().catch(() => new Promise<void>((res, rej) => {
+    if (im.complete && im.naturalWidth) { res(); return; }
+    im.onload = () => res(); im.onerror = () => rej(new Error("image"));
+  }));
 
 export default function ProjectDetail({ index }: { index: number }) {
   const p = projects[index];
@@ -213,6 +222,10 @@ export default function ProjectDetail({ index }: { index: number }) {
   const holdRef = useRef<HTMLImageElement>(null);
   const router = useRouter();
   const no = (i: number) => String(i + 1).padStart(2, "0");
+  const nextP = projects[(index + 1) % projects.length];
+
+  // arriving from the previous project's "Next": glitch in (no-op otherwise)
+  useLayoutEffect(() => { tvOn(rootRef.current); }, []);
 
   // Before the first paint: if we came from the home page, show its still (the clicked
   // screen in place) until the 3D scene draws its first frame.
@@ -286,7 +299,8 @@ export default function ProjectDetail({ index }: { index: number }) {
     // the home computer's screen picture (this screen leaves the computer showing it, then
     // fades into the pictures; and back again on the way home)
     let cardTex: WebGLTexture | null = null;
-    (document.fonts?.ready ?? Promise.resolve()).then(() => {
+    // (fonts.ready can take long on a phone: never wait more than 1.5 s for it)
+    Promise.race([document.fonts?.ready ?? Promise.resolve(), new Promise((r) => window.setTimeout(r, 1500))]).then(() => {
       const c = document.createElement("canvas"); c.width = TW; c.height = TH;
       drawScreenFace(c.getContext("2d")!, p, index, projects.length, { prompt: true });
       cardTex = tex2d(c);
@@ -301,8 +315,17 @@ export default function ProjectDetail({ index }: { index: number }) {
     shots.forEach((src, i) => {
       if (isVideo(src)) {
         const el = document.createElement("video");
-        el.src = src; el.muted = true; el.loop = true; el.playsInline = true; el.preload = "auto";
+        el.muted = true; el.loop = true; el.playsInline = true; el.preload = "auto";
+        el.setAttribute("muted", ""); el.setAttribute("playsinline", "");   // iOS reads the attributes
+        el.src = src;
+        // iOS Safari only loads a video that is on the page and asked to play (muted inline play is
+        // allowed): keep it in the page, invisible, and start it; it pauses again if not in front
+        el.style.cssText = "position:fixed;left:0;top:0;width:2px;height:2px;opacity:0;pointer-events:none;";
+        el.setAttribute("aria-hidden", "true");
+        root.appendChild(el);
+        void el.play().catch(() => {});
         el.addEventListener("loadeddata", () => {
+          if (i !== selRef.current) { el.pause(); el.currentTime = 0; }
           const c = document.createElement("canvas"); c.width = TW; c.height = TH;
           const g = c.getContext("2d")!;
           drawCrop(g, el, el.videoWidth, el.videoHeight);
@@ -318,7 +341,7 @@ export default function ProjectDetail({ index }: { index: number }) {
         return;
       }
       const img = new Image(); img.src = src;
-      img.decode().then(() => {
+      decoded(img).then(() => {
         const c = document.createElement("canvas"); c.width = TW; c.height = TH;
         const x = c.getContext("2d")!;
         const s = Math.max(TW / img.naturalWidth, TH / img.naturalHeight);
@@ -449,17 +472,17 @@ export default function ProjectDetail({ index }: { index: number }) {
     let endQuad = startQuad;
     // the home page still, shown around the screen while the room grows out / shrinks back
     const shot = start ? homeShot() : null;
-    let snapTex: WebGLTexture | null = null;
+    let snapTex: WebGLTexture | null = null, snapFail = false;
     if (shot) {
       const im = new Image(); im.src = shot;
-      im.decode().then(() => {
+      decoded(im).then(() => {
         snapTex = gl.createTexture();
         gl.bindTexture(gl.TEXTURE_2D, snapTex);
         gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, gl.RGBA, gl.UNSIGNED_BYTE, im);
         gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.LINEAR);
         gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE);
         gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE);
-      }).catch(() => {});
+      }).catch(() => { snapFail = true; });
     }
 
     // pointer: the camera turns toward it, so the scene moves against it
@@ -552,13 +575,32 @@ export default function ProjectDetail({ index }: { index: number }) {
     canvas.addEventListener("wheel", onWheel, { passive: false });
 
     let raf = 0, first = true;
+    // phones: the free band between the top bar (with "Next project") and the text, in clip
+    // units, measured from the page (fonts and copy change its size); the middle screen fits in it
+    const band = { top: 0.62, bottom: 0.05, ok: false };
+    const measure = () => {
+      const info = root.querySelector<HTMLElement>(".pd__info"), nx = root.querySelector<HTMLElement>(".pd__next");
+      const cr = canvas.getBoundingClientRect();
+      if (!info || !cr.height) return;
+      const topPx = Math.max(nx ? nx.getBoundingClientRect().bottom : 0, 0) + 14;
+      const botPx = info.getBoundingClientRect().top - 12;
+      band.top = 1 - (2 * (topPx - cr.top)) / cr.height;
+      band.bottom = 1 - (2 * (botPx - cr.top)) / cr.height;
+      band.ok = band.top - band.bottom > 0.2;
+    };
+    measure();
+    const measureT = window.setInterval(measure, 600);
     const t0 = performance.now();
     let last = t0;
     const frame = (now: number) => {
       raf = requestAnimationFrame(frame);
       const dt = Math.max(0, Math.min((now - last) / 1000, 1 / 20));
       last = now;
-      if ((!texs[selRef.current] || (shot && !snapTex) || (start && !cardTex)) && T === 0 && dir > 0) return; // wait for the pictures
+      // wait for the pictures and the 3D room before opening (phones on Wi-Fi need a moment), but
+      // never forever: after 4.5 s it opens with whatever is there
+      const waited = now - t0;
+      const notReady = !texs[selRef.current] || (shot && !snapTex && !snapFail) || (start && !cardTex) || (!!p.scene3d && !place && waited < 4000);
+      if (notReady && waited < 4500 && T === 0 && dir > 0) return;
       if (!reduced) { mx += (tx - mx) * 0.06; my += (ty - my) * 0.06; }
       if (dir > 0) T = Math.min(1, T + dt / (OPEN_MS / 1000));
       else { T = Math.max(0, T - dt / (CLOSE_MS / 1000)); if (T === 0 && goHome) { const g = goHome; goHome = null; g(); } }
@@ -635,9 +677,21 @@ export default function ProjectDetail({ index }: { index: number }) {
         const d = kk - slide;                       // -1 left slot, 0 middle, 1 right slot
         const ad = Math.min(Math.abs(d), 1.6);
         const k = Math.abs(d) < 0.5 ? 0 : Math.sign(d);
-        const to = { x: d * (SW + 0.3), y: 0.3, z: -4.2 + 0.2 * Math.min(ad, 1), yaw: Math.max(-1.6, Math.min(1.6, d)) * 0.24 };
+        // narrow screens: the middle screen fits the width (92%) and sits in the upper part, clear
+        // of the text below; its neighbours stay off to the sides
+        // (the page's curved lens enlarges it ~25%, hence 1.15 for ~70% of the width on phones)
+        let zMid = aspect < 0.8 ? Math.max(4.2, (SW * f) / (aspect * 1.6)) : 4.2;
+        let lift = aspect < 1 ? 0.24 : -1;
+        if (aspect < 0.62 && band.ok) {
+          // fit the band: its height (less the lens's ~25% enlargement) and at most 72% of the width
+          const hClip = ((band.top - band.bottom) * 0.92) / 1.25;
+          zMid = Math.max((SH * f) / hClip, (SW * f) / (aspect * 1.15));
+          lift = ((band.top + band.bottom) / 2) * 0.9;              // the lens pushes it out a little
+        }
+        const yMid = lift > -0.99 ? (lift * zMid) / f : 0.3;
+        const to = { x: d * (SW + 0.3), y: yMid, z: -zMid + 0.2 * Math.min(ad, 1), yaw: Math.max(-1.6, Math.min(1.6, d)) * 0.24 };
         // side screens slide out from behind the middle one when the page opens
-        const from = k === 0 ? to : { x: 0, y: 0.3, z: -5.2, yaw: 0 };
+        const from = k === 0 ? to : { x: 0, y: yMid, z: -zMid - 1, yaw: 0 };
         const w = k === 0 ? 1 : ease(sideIn);
         const sx = from.x + (to.x - from.x) * w, sy = from.y + (to.y - from.y) * w;
         const sz = from.z + (to.z - from.z) * w, syaw = from.yaw + (to.yaw - from.yaw) * w;
@@ -708,8 +762,8 @@ export default function ProjectDetail({ index }: { index: number }) {
     };
     raf = requestAnimationFrame(frame);
     return () => {
-      cancelAnimationFrame(raf);
-      vids.forEach((v) => { if (v) { v.el.pause(); v.el.removeAttribute("src"); v.el.load(); } });
+      cancelAnimationFrame(raf); window.clearInterval(measureT);
+      vids.forEach((v) => { if (v) { v.el.pause(); v.el.removeAttribute("src"); v.el.load(); v.el.remove(); } });
       placeDead = true; placeStop();
       window.removeEventListener("resize", fit);
       window.removeEventListener("pointermove", onMove);
@@ -785,10 +839,12 @@ export default function ProjectDetail({ index }: { index: number }) {
         <div>
           <h2 className="pd__label">Project</h2>
           <h1 id="pd-name" className="pd__name">{p.name}</h1>
+          {p.context && <p className="pd__context">{p.context}</p>}
         </div>
         <div>
           <h2 className="pd__label">Info</h2>
           <p className="pd__text">{p.summary}</p>
+          {p.story && <p className="pd__story">{p.story}</p>}
           {(p.links?.live || p.links?.code) && (
             <p className="pd__links">
               {p.links?.live && <a href={p.links.live} target="_blank" rel="noopener noreferrer">Live ↗</a>}
@@ -815,6 +871,12 @@ export default function ProjectDetail({ index }: { index: number }) {
           ))}
         </ol>
       </section>
+
+      {/* straight to the next project (loops), through the glitch page switch */}
+      <TvLink className="pd__next pd__hud" href={`/projects/${nextP.slug}/`}>
+        <span className="pd__next-label">Next project <span className="pd__next-arrow" aria-hidden="true">▸</span></span>
+        <span className="pd__next-name">{nextP.name}</span>
+      </TvLink>
 
       {/* the viewer: the picture whole (the screens crop it to their curved shape) */}
       {view !== null && (

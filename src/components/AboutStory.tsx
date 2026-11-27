@@ -11,6 +11,7 @@ import TvLink from "./TvLink";
 import { tvOn } from "@/lib/tv";
 import { loading } from "@/lib/loading";
 import { aboutTv } from "@/lib/aboutTv";
+import { lightInk } from "@/lib/stage";
 import AboutTv from "./AboutTv";
 
 /*
@@ -96,11 +97,16 @@ vec2 crt(vec2 local, float t){
 /** The pointer, eased, shared by every canvas and the text (like the project page). */
 const turn = { x: 0, y: 0, tx: 0, ty: 0 };
 /** The text moves -14px × x and +8px × y (down) with the pointer; particles move the same, in clip units. */
-const turnClip = (): [number, number] => [(-turn.x * 14 * 2) / innerWidth, (-turn.y * 8 * 2) / innerHeight];
+const turnClip = (): [number, number] => [(-turn.x * 14 * 2) / innerWidth, (-turn.y * 8 * 2) / stableH()];
+/** The screen height the canvases are laid out for: Safari's FULL height (its toolbar hiding on
+ *  the first scroll changes innerHeight, which used to shift every particle up, then back). */
+const stableH = () => Math.max(innerHeight, document.querySelector<HTMLElement>(".ab__portrait")?.clientHeight || 0);
+/** Touch screens: the particles don't react to a finger (no lens, no liquid smear, no turn). */
+const touchUI = () => lightInk();
 
 function rectOf(canvas: HTMLCanvasElement): [number, number, number, number] {
-  const r = canvas.getBoundingClientRect();
-  return [r.left / innerWidth, r.top / innerHeight, r.width / innerWidth, r.height / innerHeight];
+  const r = canvas.getBoundingClientRect(), h = stableH();
+  return [r.left / innerWidth, r.top / h, r.width / innerWidth, r.height / h];
 }
 
 /* ---------- 1. Portrait in particles ---------- */
@@ -392,7 +398,8 @@ function Portrait({ src }: { src: string }) {
       const Q = program(gl, PHOTO_VS, PHOTO_FS, ["a_pos"]);
       // Sample the cut-out (transparent background): dense where it's lit, thinner in the
       // dark clothes, with the brightness stretched so the figure reads as lit.
-      const W = 460, H = Math.round((W * img.naturalHeight) / img.naturalWidth);
+      // phones: fewer particles (the figure is smaller there; ~half the count keeps it smooth)
+      const W = innerWidth <= 760 ? 320 : 460, H = Math.round((W * img.naturalHeight) / img.naturalWidth);
       const c = document.createElement("canvas"); c.width = W; c.height = H;
       const x = c.getContext("2d", { willReadFrequently: true })!;
       x.drawImage(img, 0, 0, W, H);
@@ -411,8 +418,12 @@ function Portrait({ src }: { src: string }) {
       for (let k = 0; k < W * H; k++) if (d[k * 4 + 3] > 128) ls.push((0.299 * d[k * 4] + 0.587 * d[k * 4 + 1] + 0.114 * d[k * 4 + 2]) / 255);
       ls.sort((a, b) => a - b);
       const lo = ls[Math.floor(ls.length * 0.03)] ?? 0, hi = ls[Math.floor(ls.length * 0.98)] ?? 1;
-      const HB = 0.86;                                 // the figure is 86% of the canvas height,
-      const DY = -(1 - HB);                            // standing on the bottom edge (room above the head)
+      // the canvas is always the full screen (the year / TV / form targets assume it). Desktop and
+      // tablets: the figure is 86% of its height, standing on the bottom edge. Phones: it stands
+      // on a line 70% down, so the text fits under it.
+      const phoneFig = innerWidth <= 760;
+      const HB = phoneFig ? 0.6 : 0.86;                // half-height in clip units
+      const DY = phoneFig ? HB - 0.4 : -(1 - HB);      // its feet at y = -0.4 (phones) or the bottom edge
       const sc = (2 * HB) / H;
       const home: number[] = [], lum: number[] = [];
       for (let j = 0; j < H; j++) for (let i = 0; i < W; i++) {
@@ -446,7 +457,7 @@ function Portrait({ src }: { src: string }) {
         const vw = innerWidth, vh = innerHeight, k = 0.5;                 // drawn at half size
         // desktop: where the section reaches the top; phones (shorter stage, TV above the form):
         // where the form's title is just below the top bar
-        formY = vw > 760 ? sec.getBoundingClientRect().top + scrollY : form.getBoundingClientRect().top + scrollY - vh * 0.14;
+        formY = !(vw <= 760 || (vw <= 1100 && vh > vw)) ? sec.getBoundingClientRect().top + scrollY : form.getBoundingClientRect().top + scrollY - vh * 0.14;
         formY = Math.min(formY, document.documentElement.scrollHeight - vh - 2);   // the page must reach it
         const c = document.createElement("canvas"); c.width = Math.round(vw * k); c.height = Math.round(vh * k);
         const g = c.getContext("2d", { willReadFrequently: true })!;
@@ -486,11 +497,10 @@ function Portrait({ src }: { src: string }) {
         const yc = document.querySelector<HTMLCanvasElement>(".ab__year");
         const holder = yc?.parentElement;
         if (!yc || !holder) return;
-        const vw = innerWidth, vh = innerHeight;
-        const r = yc.getBoundingClientRect();
+        const r = yc.getBoundingClientRect(), cr = canvas.getBoundingClientRect();
         const top = parseFloat(getComputedStyle(holder).top) || 0;      // sticky top
         stickY = r.top + scrollY - top;                                   // scroll where it sticks
-        const ca = r.width / r.height, va = vw / vh;
+        const ca = r.width / r.height, va = cr.width / cr.height;
         // scroll where the year lets go again (the end of the timeline)
         const grid = holder.parentElement!;
         unstickY = grid.getBoundingClientRect().bottom + scrollY - top - holder.offsetHeight;
@@ -500,8 +510,8 @@ function Portrait({ src }: { src: string }) {
           for (let i = 0; i < N; i++) {
             const cx = pts[i * 2] / ca, cy = pts[i * 2 + 1];              // clip units in the year canvas
             const px = r.left + (cx * 0.5 + 0.5) * r.width, py = top + (0.5 - cy * 0.5) * r.height;
-            out[i * 2] = (px / vw * 2 - 1) * va;
-            out[i * 2 + 1] = 1 - (py / vh) * 2;
+            out[i * 2] = ((px - cr.left) / cr.width * 2 - 1) * va;
+            out[i * 2 + 1] = 1 - ((py - cr.top) / cr.height) * 2;
           }
           return out;
         };
@@ -530,7 +540,15 @@ function Portrait({ src }: { src: string }) {
       let dpr = 1;
       const fit = () => { dpr = Math.min(devicePixelRatio || 1, 2); canvas.width = Math.round(canvas.clientWidth * dpr); canvas.height = Math.round(canvas.clientHeight * dpr); };
       fit();
-      const onResize = () => { fit(); buildYear(); buildForm(); };
+      // (Safari's toolbar showing / hiding only changes the height a little: no rebuild for that,
+      // it would stall the first scroll)
+      let lastW = innerWidth, lastH = innerHeight;
+      const onResize = () => {
+        fit();
+        if (innerWidth === lastW && Math.abs(innerHeight - lastH) < 160) return;
+        lastW = innerWidth; lastH = innerHeight;
+        buildYear(); buildForm();
+      };
       addEventListener("resize", onResize);
       const m = { x: 9, y: 9, sx: 9, sy: 9, on: false };
       const wts = new Float32Array(11);
@@ -538,6 +556,7 @@ function Portrait({ src }: { src: string }) {
       let lastT = performance.now();
       let reveal = 0;
       const onMove = (e: PointerEvent) => {
+        if (touchUI()) return;
         const r = canvas.getBoundingClientRect();
         m.x = ((e.clientX - r.left) / r.width * 2 - 1) * (r.width / r.height);
         m.y = -((e.clientY - r.top) / r.height * 2 - 1);
@@ -599,7 +618,10 @@ function Portrait({ src }: { src: string }) {
         const ts = (now - switchT) / 1000, step = Math.floor(ts / 0.045);
         const flick = ts < 0.36 ? (formLive ? [1, 0.15, 1, 0, 0.7, 0.05, 0.4, 0][step] : [0, 0.6, 0, 1, 0.3, 1, 0.7, 1][step]) : formLive ? 0 : 1;
         const glitch = ts < 0.36 ? 1 : 0;
-        const fade = Math.max(1 - hand, back) * flick * (1 - stackHide);
+        // phones: the year is a faint watermark behind the timeline, so the particles dim as they
+        // become it (and brighten again on the way to the form)
+        const yearDim = phoneFig ? 1 - 0.6 * (back > 0 ? 1 - toForm : toYear) : 1;
+        const fade = Math.max(1 - hand, back) * flick * (1 - stackHide) * yearDim;
         const yEl = document.querySelector<HTMLElement>(".ab__year");
         if (yEl) yEl.style.opacity = String(stickY < 1e8 ? hand * (1 - back) : 1);
         // fewer particles on the way to the year (it reads best light), more again for the form
@@ -783,6 +805,7 @@ function YearParticles({ year }: { year: string }) {
     addEventListener("resize", onResize);
     const m = { x: 9, y: 9, sx: 9, sy: 9 };
     const onMove = (e: PointerEvent) => {
+      if (touchUI()) return;
       const r = canvas.getBoundingClientRect();
       m.x = ((e.clientX - r.left) / r.width * 2 - 1) * aspect;
       m.y = -((e.clientY - r.top) / r.height * 2 - 1);
@@ -881,7 +904,7 @@ function CrtBackground() {
     buffer(gl, 0, new Float32Array([-1, -1, 3, -1, -1, 3]), 2);
     const fit = () => { const d = Math.min(devicePixelRatio || 1, 1.5); canvas.width = Math.round(innerWidth * d); canvas.height = Math.round(innerHeight * d); };
     fit(); addEventListener("resize", fit);
-    const onMove = (e: PointerEvent) => { turn.tx = (e.clientX / innerWidth) * 2 - 1; turn.ty = -((e.clientY / innerHeight) * 2 - 1); };
+    const onMove = (e: PointerEvent) => { if (touchUI()) return; turn.tx = (e.clientX / innerWidth) * 2 - 1; turn.ty = -((e.clientY / innerHeight) * 2 - 1); };
     addEventListener("pointermove", onMove, { passive: true });
     const reduced = matchMedia("(prefers-reduced-motion: reduce)").matches;
     const root = canvas.closest<HTMLElement>(".ab");

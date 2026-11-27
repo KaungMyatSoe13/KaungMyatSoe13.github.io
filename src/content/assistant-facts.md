@@ -9,6 +9,9 @@ Lines starting with "TODO" are drafts for Kaung to confirm or delete.
 - Currently a web developer at a marketing agency in Singapore (since 2026): WordPress,
   Elementor and Shopify sites built from scratch to launch, with many plugins and some custom
   plugins he wrote himself. He deploys the sites live himself.
+- Numbers from that job: 50+ info and e-commerce sites built; his custom plugins run on 50+
+  client sites; he also builds AI automation for the agency's internal workflows. This work
+  belongs to the company, so it can't be shown or named: say so if asked for links.
 - Before that he freelanced for about 10 months after graduating (2025): websites and apps for
   his own clients, from the first call to going live.
 - TODO: Open to freelance projects? Open to full-time roles? Say what kind, e.g. "open to
@@ -24,6 +27,14 @@ Lines starting with "TODO" are drafts for Kaung to confirm or delete.
   vision, deep learning, NLP. He loves learning AI, machine learning and deep learning.
 - Tools: Git and GitHub, Figma, Jupyter, Google Colab, NumPy, Pandas, Google Cloud, Vercel,
   Railway, REST APIs.
+
+## Why he built each project
+- KotobaLab: he was studying for the JLPT N5 and couldn't find a good way to practise the
+  vocabulary, so he built his own. Solo.
+- ShopShop: built in his free time to learn the whole e-commerce flow. Solo, self-study.
+- Myanglish Translator: typing Burmese on a laptop was hard, so he made a tool for himself. Solo.
+- PeakFit: his university final-year project, a team of five. He says it was fun.
+- EmoFace: a group project for his AI course, a team of five. He had a good time.
 
 ## Other projects (not on the site)
 - Face recognition system (2024): real-time face authentication with a webcam, using transfer

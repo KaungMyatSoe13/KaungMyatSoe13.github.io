@@ -19,14 +19,17 @@ export default function Cursor() {
     root.classList.add("has-cursor");
 
     let x = -100, y = -100, rx = -100, ry = -100, raf = 0, seen = false;
+    // real mouse only: Hand mode sends its own (untrusted) pointer events and has its own ring,
+    // so the mouse cursor stays usable alongside it
     const onMove = (e: PointerEvent) => {
+      if (!e.isTrusted) return;
       x = e.clientX; y = e.clientY;
       if (!seen) { rx = x; ry = y; seen = true; root.classList.add("cursor-on"); }
       const t = e.target as Element | null;
       ring.dataset.hover = String(!!t?.closest("a, button, [role='button'], .work-row__name, [data-hot='true']"));
     };
-    const onDown = () => { ring.dataset.down = "true"; };
-    const onUp = () => { ring.dataset.down = "false"; };
+    const onDown = (e: PointerEvent) => { if (e.isTrusted) ring.dataset.down = "true"; };
+    const onUp = (e: PointerEvent) => { if (e.isTrusted) ring.dataset.down = "false"; };
     const onLeave = () => root.classList.remove("cursor-on");
     const onEnter = () => { if (seen) root.classList.add("cursor-on"); };
 

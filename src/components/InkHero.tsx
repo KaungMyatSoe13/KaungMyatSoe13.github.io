@@ -2,7 +2,7 @@
 
 import { useEffect, useRef, useState } from "react";
 import { K_PARTS, drawK, kBox } from "@/lib/kMark";
-import { floodOrigin, snap } from "@/lib/stage";
+import { floodOrigin, lightInk, snap } from "@/lib/stage";
 import { site } from "@/content/site";
 
 /*
@@ -341,6 +341,23 @@ export default function InkHero({ arcade = false }: { arcade?: boolean }) {
       progress = Math.min(1, Math.max(0, -r.top / span));
     };
     readScroll();
+
+    // Phones / tablets on the arcade home: no ink sim at all, the arcade draws the flood (see
+    // lightInk). This only keeps the page's own state (corner texts, --p, drained) in step.
+    if (arcade && lightInk()) {
+      wrap.dataset.intro = "done";
+      const onScroll = () => {
+        readScroll();
+        wrap.style.setProperty("--p", progress.toFixed(3));
+        wrap.dataset.corners = progress < 0.05 ? "on" : "off";
+        const drained = progress > DRAIN_END - 0.05 ? "1" : "0";
+        if (wrap.dataset.drained !== drained) wrap.dataset.drained = drained;
+      };
+      window.addEventListener("scroll", onScroll, { passive: true });
+      onScroll();
+      const late = window.setTimeout(onScroll, 200);
+      return () => { window.clearTimeout(late); window.removeEventListener("scroll", onScroll); };
+    }
 
     // No WebGL2 (or no half-float targets): the SVG K stays, and a plain fade carries the flood.
     const gl = canvas.getContext("webgl2", { antialias: false, alpha: true, premultipliedAlpha: false, preserveDrawingBuffer: arcade });

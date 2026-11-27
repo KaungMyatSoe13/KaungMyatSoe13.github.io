@@ -10,19 +10,19 @@
 
 ## About (from his About page)
 - 22, based in Singapore, and I build for the web with modern frameworks: React, Next.js, TypeScript and Node, from the interface all the way to the API and the database.
-- I also build WordPress, Elementor and Shopify sites, custom plugins included, and I love learning AI, machine learning and deep learning. Always shipping, always learning.
+- I've also built 50+ WordPress, Elementor and Shopify sites, written custom plugins that now run on 50+ client sites, and set up AI automation for everyday workflows. I love learning AI, machine learning and deep learning. Always shipping, always learning.
 
 ## Career timeline
 - 2023: Diploma in Information Technology, Singapore Institute of Management. Graduated April 2023. Where the coding bug bit, hard.
 - 2025: Bachelor of Computer Science, Big Data, University of Wollongong. Graduated March 2025. Data, AI and a lot of late-night builds.
 - 2025: Freelance Web Developer, Self-employed · 10 months. Straight out of uni: websites and apps for my own clients, from the first call to going live.
-- 2026 (now): Web Developer, Marketing agency, Singapore. WordPress, Elementor and Shopify sites built from scratch to launch. Lots of plugins, a few custom ones of my own, and I deploy them live myself.
+- 2026 (now): Web Developer, Marketing agency, Singapore. 50+ info and e-commerce sites on WordPress, Elementor and Shopify, from scratch to launch. My custom plugins now run on 50+ client sites, and I build AI automation for our internal workflows.
 
 ## How he works
 - Discover: Start with the right questions. Understanding the people, the goals and the problem before a single pixel or line of code.
 - Design: From the first sketch. Wireframes to polished UI: layouts, type and colour that work on every screen size.
 - Architect: Plan the parts before building them. Choosing the stack and shaping the system: frontend, APIs, data and auth, built to grow.
-- Build: Turning plans into working software. Full-stack apps with React, Next.js, TypeScript and Node, plus WordPress, Elementor and Shopify sites with custom plugins.
+- Build: Turning plans into working software. Full-stack apps with React, Next.js, TypeScript and Node, WordPress, Elementor and Shopify sites with custom plugins, and AI automation that takes the busywork out of a team's day.
 - Launch: Getting it into people's hands. Going live with fast loading, clean SEO and nothing left broken.
 - Maintain: Keeping it healthy after launch. Fixes, updates and improvements, so the product keeps working as it grows.
 
@@ -67,6 +67,9 @@
 - Currently a web developer at a marketing agency in Singapore (since 2026): WordPress,
   Elementor and Shopify sites built from scratch to launch, with many plugins and some custom
   plugins he wrote himself. He deploys the sites live himself.
+- Numbers from that job: 50+ info and e-commerce sites built; his custom plugins run on 50+
+  client sites; he also builds AI automation for the agency's internal workflows. This work
+  belongs to the company, so it can't be shown or named: say so if asked for links.
 - Before that he freelanced for about 10 months after graduating (2025): websites and apps for
   his own clients, from the first call to going live.
 - Best way to reach him: email (kaungsoe132004@gmail.com) or LinkedIn.
@@ -80,6 +83,14 @@
   vision, deep learning, NLP. He loves learning AI, machine learning and deep learning.
 - Tools: Git and GitHub, Figma, Jupyter, Google Colab, NumPy, Pandas, Google Cloud, Vercel,
   Railway, REST APIs.
+
+## Why he built each project
+- KotobaLab: he was studying for the JLPT N5 and couldn't find a good way to practise the
+  vocabulary, so he built his own. Solo.
+- ShopShop: built in his free time to learn the whole e-commerce flow. Solo, self-study.
+- Myanglish Translator: typing Burmese on a laptop was hard, so he made a tool for himself. Solo.
+- PeakFit: his university final-year project, a team of five. He says it was fun.
+- EmoFace: a group project for his AI course, a team of five. He had a good time.
 
 ## Other projects (not on the site)
 - Face recognition system (2024): real-time face authentication with a webcam, using transfer

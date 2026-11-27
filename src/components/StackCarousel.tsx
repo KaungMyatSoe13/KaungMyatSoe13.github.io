@@ -3,21 +3,23 @@
 import { useEffect, useRef } from "react";
 import { stack } from "@/content/stack";
 
-/** px per logo slot (logo + name), the logo's size, and how fast the row runs (px/s) */
-const SLOT = 220, LOGO = 116, SPEED = 38;
+/** px per logo slot (logo + name), the logo's size, and how fast the row runs (px/s), at full
+ *  size; phones and tablets scale them down (`sizeK`) */
+const SLOT0 = 220, LOGO0 = 116, SPEED = 38;
 /** The logo sits a little above the row's middle; its name (sharp text) below it. */
-const LIFT = 16, NAME_GAP = 30;
+const LIFT0 = 16, NAME_GAP0 = 30;
+const sizeK = () => (innerWidth <= 760 ? 0.55 : innerWidth <= 1100 || matchMedia("(pointer: coarse)").matches ? 0.72 : 1);
 
 const VS = `#version 300 es
 in vec2 a_pos; in float a_slot; in vec3 a_seed;
-uniform vec2 u_res; uniform float u_off, u_L, u_slot, u_dpr, u_t, u_in, u_size;
+uniform vec2 u_res; uniform float u_off, u_L, u_slot, u_dpr, u_t, u_in, u_size, u_lift;
 uniform vec2 u_mouse;
 out float v_a; out float v_work;
 uniform float u_work[32];
 void main(){
   // the slot's centre, scrolled and wrapped round (the row loops forever)
   float cx = mod(a_slot * u_slot + u_slot * 0.5 - u_off + u_slot, u_L) - u_slot;
-  vec2 p = vec2(cx, u_res.y * 0.5 - ${LIFT.toFixed(1)}) + a_pos;
+  vec2 p = vec2(cx, u_res.y * 0.5 - u_lift) + a_pos;
   // arrive from a loose cloud when the section comes into view
   vec2 away = p + (a_seed.xy - 0.5) * vec2(u_res.y * 1.4, u_res.y * 0.9);
   float k = clamp(u_in * 1.4 - a_seed.z * 0.4, 0.0, 1.0);
@@ -44,15 +46,16 @@ void main(){
 }`;
 
 /** Particle spots for one logo, around its centre (px): dense enough to read the shape. */
-function logoPoints(d: string) {
-  const S = LOGO, c = document.createElement("canvas");
+function logoPoints(d: string, size: number) {
+  const S = Math.round(size), c = document.createElement("canvas");
   c.width = S; c.height = S;
   const g = c.getContext("2d", { willReadFrequently: true })!;
   g.fillStyle = "#fff";
   g.scale(S / 24, S / 24);
   g.fill(new Path2D(d));
   const px = g.getImageData(0, 0, S, S).data, out: number[] = [];
-  for (let y = 0; y < S; y += 1.25) for (let x = 0; x < S; x += 1.25) {
+  const st = S < 90 ? 1.05 : 1.25;                                // small logos: a little denser
+  for (let y = 0; y < S; y += st) for (let x = 0; x < S; x += st) {
     const a = px[(Math.floor(y) * S + Math.floor(x)) * 4 + 3];
     if (a > 110 && Math.random() < 0.85) out.push(x - S / 2 + Math.random() * 0.6, y - S / 2 + Math.random() * 0.6);
   }
@@ -79,12 +82,13 @@ export default function StackCarousel() {
     gl.linkProgram(prog);
     const U = (n: string) => gl.getUniformLocation(prog, n);
 
+    const k = sizeK(), SLOT = SLOT0 * k, LOGO = LOGO0 * k, LIFT = LIFT0 * k, NAME_GAP = NAME_GAP0 * k;
     let count = 0;
     const vao = gl.createVertexArray();
     const build = () => {
       const pos: number[] = [], slot: number[] = [], seed: number[] = [];
       stack.forEach((t, i) => {
-        const pts = logoPoints(t.d);
+        const pts = logoPoints(t.d, LOGO);
         for (let k = 0; k < pts.length; k += 2) { pos.push(pts[k], pts[k + 1]); slot.push(i); seed.push(Math.random(), Math.random(), Math.random()); }
       });
       count = slot.length;
@@ -118,10 +122,11 @@ export default function StackCarousel() {
     // pointer: nudge, slow down, drag
     const m = { x: -9999, y: -9999, over: false, drag: false, lastX: 0, v: 0 };
     let off = 0, speed = SPEED;
+    const touch = matchMedia("(pointer: coarse)").matches || navigator.maxTouchPoints > 1;
     const onMove = (e: PointerEvent) => {
       const r = canvas.getBoundingClientRect();
-      m.x = e.clientX - r.left; m.y = e.clientY - r.top;
-      m.over = m.y >= 0 && m.y <= r.height;
+      // touch: a finger drags the row, but doesn't push the particles or slow it
+      if (!touch) { m.x = e.clientX - r.left; m.y = e.clientY - r.top; m.over = m.y >= 0 && m.y <= r.height; }
       if (m.drag) { const dx = e.clientX - m.lastX; off -= dx; m.v = -dx; m.lastX = e.clientX; }
     };
     const onDown = (e: PointerEvent) => { m.drag = true; m.lastX = e.clientX; m.v = 0; canvas.setPointerCapture(e.pointerId); };
@@ -167,7 +172,8 @@ export default function StackCarousel() {
       gl.uniform1f(U("u_slot"), SLOT);
       gl.uniform1f(U("u_L"), SLOT * stack.length);
       gl.uniform1f(U("u_dpr"), dpr);
-      gl.uniform1f(U("u_size"), 1.7);
+      gl.uniform1f(U("u_size"), k < 1 ? 1.35 : 1.7);
+      gl.uniform1f(U("u_lift"), LIFT);
       gl.uniform1f(U("u_t"), reduced ? 0 : (now - t0) / 1000);
       gl.uniform1f(U("u_in"), reduced ? 1 : inK);
       gl.uniform2f(U("u_mouse"), m.x, m.y);
@@ -176,9 +182,9 @@ export default function StackCarousel() {
       // names under the logos (same wrap as the shader)
       ng.setTransform(dpr, 0, 0, dpr, 0, 0);
       ng.clearRect(0, 0, W, H);
-      ng.font = `600 13px ${mono}`; ng.textAlign = "center"; ng.textBaseline = "top";
-      ng.letterSpacing = "2px";
-      const L = SLOT * stack.length, y = H / 2 - LIFT + LOGO / 2 + NAME_GAP - 12;
+      ng.font = `600 ${k < 0.7 ? 10 : k < 1 ? 11 : 13}px ${mono}`; ng.textAlign = "center"; ng.textBaseline = "top";
+      ng.letterSpacing = k < 1 ? "1px" : "2px";
+      const L = SLOT * stack.length, y = H / 2 - LIFT + LOGO / 2 + NAME_GAP - 12 * k;
       ng.globalAlpha = Math.max(0, inK * 1.6 - 0.6);
       stack.forEach((t, i) => {
         const cx = ((((i * SLOT + SLOT / 2 - off + SLOT) % L) + L) % L) - SLOT;

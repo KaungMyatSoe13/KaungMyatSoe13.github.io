@@ -15,6 +15,7 @@ const MODELS: Credit[] = [
   { title: "Arcade machine Street Fighter", titleUrl: "https://sketchfab.com/3d-models/arcade-machine-street-fighter-092c7ef090e44b5d896c3960c1804ea9", author: "bvbwork510524", authorUrl: "https://sketchfab.com/bvbwork510524", ...CC_BY, where: "Home" },
   { title: "DS game card", titleUrl: "https://sketchfab.com/3d-models/ds-game-card-822e8ff1a12946048a8fa9dbadf3379d", author: "maney", authorUrl: "https://sketchfab.com/maney", ...CC_BY, where: "Home" },
   ...contact.credits.map((c) => ({ ...c, ...CC_BY, where: "About" })),
+  { title: "BMO", titleUrl: "https://sketchfab.com/3d-models/bmo-0ced6fec204b4083a841113d293f6a07", author: "linus1178", authorUrl: "https://sketchfab.com/linus1178", ...CC_BY, where: "Chat mascot" },
   ...projects.filter((p) => p.scene3d).map((p) => ({ ...p.scene3d!.credit, where: p.name })),
 ];
 
@@ -48,6 +49,8 @@ export default function Credits() {
           <ul><li>{arcadeGames.map((g) => g.title).join(", ")}: covers and flyers © their publishers.</li></ul>
           <h3>Logos</h3>
           <ul><li>Tech logos from <a href="https://simpleicons.org" target="_blank" rel="noopener noreferrer">Simple Icons</a> (CC0); the brands belong to their owners.</li></ul>
+          <h3>Hand tracking</h3>
+          <ul><li><a href="https://ai.google.dev/edge/mediapipe/solutions/vision/hand_landmarker" target="_blank" rel="noopener noreferrer">MediaPipe Hand Landmarker</a> by Google (Apache 2.0), running in your browser.</li></ul>
           <h3>Fonts</h3>
           <ul><li>Inter Tight, JetBrains Mono and Doto, from Google Fonts (SIL Open Font License).</li></ul>
         </div>

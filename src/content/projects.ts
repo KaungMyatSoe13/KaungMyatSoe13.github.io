@@ -44,6 +44,10 @@ export type Project = {
   gallery?: string[];
   /** What you did on it, one item per line. */
   role?: string[];
+  /** Who made it and why, as a short tag under the name, e.g. "Solo · personal tool". */
+  context?: string;
+  /** Why it exists, in one or two plain sentences (shown under Info on the project page). */
+  story?: string;
   links?: {
     live?: string;
     code?: string;
@@ -55,11 +59,13 @@ export const projects: Project[] = [
     slug: "kotobalab",
     name: "KotobaLab",
     summary: "Japanese vocabulary trainer with lessons, quizzes and audio.",
+    context: "Solo · personal tool",
+    story: "I was studying for the JLPT N5 and couldn't find a good way to practise the vocabulary, so I built my own.",
     type: "Web",
     year: "2025",
     stack: ["Next.js", "TypeScript", "Firebase"],
     cover: "/projects/kotobalab/cover.webp",
-    gallery: ["/projects/kotobalab/g1.webp", "/projects/kotobalab/g2.webp"],
+    gallery: ["/projects/kotobalab/preview.mp4", "/projects/kotobalab/g1.webp", "/projects/kotobalab/g2.webp"],
     role: ["Design", "Full-stack development"],
     preview: "/projects/kotobalab/preview.mp4",
     scene: "/projects/kotobalab/shrine-photo.webp",
@@ -82,6 +88,8 @@ export const projects: Project[] = [
     slug: "shopshop",
     name: "ShopShop",
     summary: "Online store with order tracking and an admin dashboard.",
+    context: "Solo · self-study",
+    story: "Built in my free time to learn how a real online store works, end to end: cart, checkout, orders and the admin side.",
     type: "Web",
     year: "2025",
     stack: ["MongoDB", "Express", "React", "Node", "Cloudinary"],
@@ -99,7 +107,7 @@ export const projects: Project[] = [
         license: "CC BY 4.0", licenseUrl: "https://creativecommons.org/licenses/by/4.0/",
       },
     },
-    gallery: ["/projects/shopshop/g1.webp", "/projects/shopshop/g2.webp", "/projects/shopshop/g3.webp", "/projects/shopshop/g4.webp", "/projects/shopshop/g5.webp"],
+    gallery: ["/projects/shopshop/preview.mp4", "/projects/shopshop/g1.webp", "/projects/shopshop/g2.webp", "/projects/shopshop/g3.webp", "/projects/shopshop/g4.webp", "/projects/shopshop/g5.webp"],
     role: ["Full-stack development", "Admin dashboard"],
     preview: "/projects/shopshop/preview.mp4",
     links: {
@@ -111,6 +119,8 @@ export const projects: Project[] = [
     slug: "myanglish",
     name: "Myanglish Translator",
     summary: "Turns romanised Burmese into Burmese script as you type.",
+    context: "Solo · personal tool",
+    story: "Typing Burmese on a laptop was a pain, so I made a tool I could use myself: type it the way it sounds, get the script.",
     type: "Web",
     year: "2025",
     stack: ["React", "Tailwind CSS"],
@@ -127,7 +137,7 @@ export const projects: Project[] = [
         license: "CC BY 4.0", licenseUrl: "https://creativecommons.org/licenses/by/4.0/",
       },
     },
-    gallery: ["/projects/myanglish/g1.webp", "/projects/myanglish/g2.webp"],
+    gallery: ["/projects/myanglish/preview.mp4", "/projects/myanglish/g1.webp", "/projects/myanglish/g2.webp"],
     role: ["Frontend development"],
     preview: "/projects/myanglish/preview.mp4",
     links: {
@@ -139,6 +149,8 @@ export const projects: Project[] = [
     slug: "peakfit",
     name: "PeakFit",
     summary: "Fitness app with workout plans, progress tracking and an admin panel.",
+    context: "Uni final-year project · team of 5",
+    story: "Our final-year project at uni, built by a team of five. A lot of work, and a lot of fun.",
     type: "Mobile",
     year: "2024",
     stack: ["React Native", "TypeScript", "Firebase"],
@@ -155,7 +167,7 @@ export const projects: Project[] = [
         license: "CC BY 4.0", licenseUrl: "https://creativecommons.org/licenses/by/4.0/",
       },
     },
-    gallery: ["/projects/peakfit/g1.webp", "/projects/peakfit/g2.webp", "/projects/peakfit/g3.webp"],
+    gallery: ["/projects/peakfit/preview.mp4", "/projects/peakfit/g1.webp", "/projects/peakfit/g2.webp", "/projects/peakfit/g3.webp"],
     role: ["App development", "Admin dashboard"],
     preview: "/projects/peakfit/preview.mp4",
   },
@@ -163,6 +175,8 @@ export const projects: Project[] = [
     slug: "emoface",
     name: "EmoFace",
     summary: "Reads emotions from faces with a deep-learning model.",
+    context: "AI course project · team of 5",
+    story: "A group project for my AI course, five of us. We trained a model to read emotions from faces, and had a good time doing it.",
     type: "AI",
     year: "2024",
     stack: ["Python", "TensorFlow", "PyTorch", "OpenCV"],

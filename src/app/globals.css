@@ -86,13 +86,13 @@ body {
 .ink-hero {
   position: relative;
   /* Two screens of scroll: the K, then the ink drains to reveal the showcase under it. */
-  height: 200svh;
+  height: 200lvh;   /* lvh: Safari's full height (toolbar hidden), so nothing leaves a strip */
 }
 .ink-stage {
   position: sticky;
   top: 0;
   z-index: 2;
-  height: 100svh;
+  height: 100lvh;
   overflow: hidden;
 }
 .ink-hero[data-drained="1"] .ink-stage { pointer-events: none; }
@@ -559,8 +559,8 @@ html[data-cursor-big="on"] .cursor__ring > span { width: var(--cursor-big); heig
   position: sticky;
   top: 0;
   z-index: 0;
-  margin-top: -200svh;
-  height: 100svh;
+  margin-top: -200lvh;
+  height: 100lvh;
   overflow: hidden;
   color: var(--ink);
 }
@@ -629,7 +629,7 @@ html[data-cursor-big="on"] .cursor__ring > span { width: var(--cursor-big); heig
 .sc__summary span { display: block; margin-top: 6px; font: 11px/1 var(--font-mono); letter-spacing: 0.14em; text-transform: uppercase; color: var(--ink-soft); }
 /* one line, so it reaches over the cabinet: a paper chip behind it keeps it readable */
 .sc .sc__summary span { display: inline-block; padding: 5px 8px; margin-left: -8px; background: color-mix(in srgb, var(--paper) 88%, transparent); color: var(--ink); }
-@media (max-width: 760px) {
+@media (max-width: 760px), (max-width: 1100px) and (orientation: portrait) {
   .sc__list .sc__title { display: none; }
   /* phones: the menu is a row under the top bar */
   .sc__list .sc__menu { top: 54px; }
@@ -758,6 +758,17 @@ html[data-cursor-big="on"] .cursor__ring > span { width: var(--cursor-big); heig
 .pd__close:hover span:first-child { transform: translateX(4px); }
 .pd__close:hover span:last-child { transform: translateX(-4px); }
 .pd__count { justify-self: end; color: rgba(233, 230, 223, 0.5); }
+/* "Next project ▸": bottom right, above the Hand mode chip */
+.pd__next {
+  position: absolute; z-index: 5; right: var(--gutter); bottom: 118px; display: grid; justify-items: end; gap: 6px;
+  color: #f6f3ec; text-decoration: none; text-transform: uppercase; text-align: right; padding: 8px 0 8px 12px;
+}
+.pd__next-label { font: 500 13px/1 var(--font-dot), var(--font-mono); letter-spacing: 0.08em; color: #ffd21f; }
+.pd__next-arrow { display: inline-block; animation: pd-nudge 1.2s steps(2) infinite; }
+.pd__next-name { font: 900 22px/1 var(--font-dot), var(--font-mono); letter-spacing: -0.01em; transition: color 0.15s steps(2); }
+.pd__next:hover .pd__next-name, .pd__next:hover .pd__next-label { color: #ff3b3b; }
+@keyframes pd-nudge { 50% { transform: translateX(4px); } }
+@media (prefers-reduced-motion: reduce) { .pd__next-arrow { animation: none; } }
 .pd__info {
   position: absolute; z-index: 4; left: 0; right: 0; bottom: 11vh;
   display: grid; grid-template-columns: 1fr 1.3fr 1fr auto; gap: 3vw;
@@ -778,6 +789,9 @@ html[data-cursor-big="on"] .cursor__ring > span { width: var(--cursor-big); heig
 .pd__label { margin: 0 0 10px; font: 500 15px/1 var(--font-dot), var(--font-mono); letter-spacing: 0.06em; color: #ffd21f; }
 .pd__name { margin: 0; font: 900 28px/1 var(--font-dot), var(--font-mono); letter-spacing: -0.02em; }
 .pd__text { margin: 0; padding: 0; list-style: none; font: 700 15px/1.25 var(--font-dot), var(--font-mono); letter-spacing: 0.02em; max-width: 30ch; }
+.pd__context { margin: 10px 0 0; font: 700 12px/1.3 var(--font-mono); letter-spacing: 0.08em; color: #ffd21f; opacity: 0.85; }
+.pd__context::before { content: "▸ "; }
+.pd__story { margin: 10px 0 0; max-width: 44ch; font: 400 13px/1.45 var(--font-mono); letter-spacing: 0; text-transform: none; color: rgba(246, 243, 236, 0.82); }
 .pd__built { display: flex; flex-wrap: wrap; gap: 6px 14px; max-width: 26ch; }
 .pd__built li::before { content: "▸ "; color: #ffd21f; }
 .pd__links { margin: 12px 0 0; display: flex; gap: 18px; font: 700 15px/1 var(--font-dot), var(--font-mono); }
@@ -799,9 +813,39 @@ html[data-cursor-big="on"] .cursor__ring > span { width: var(--cursor-big); heig
 .pd__thumbs button { width: 64px; aspect-ratio: 1.55; padding: 0; border: 1px solid rgba(233, 230, 223, 0.25); background: #000; overflow: hidden; opacity: 0.55; transition: opacity 0.3s ease, border-color 0.3s ease; }
 .pd__thumbs button[aria-current="true"], .pd__thumbs button:hover { opacity: 1; border-color: #fff; }
 .pd__thumbs :is(img, video) { width: 100%; height: 100%; object-fit: cover; object-position: top; display: block; }
+/* tablets / small laptops: the four columns were squashed; pictures get their own row and
+   "Next project" moves up under the top bar */
+@media (max-width: 1200px) {
+  .pd__info { grid-template-columns: 1fr 1.4fr 1fr; gap: 22px 3vw; padding: 0 var(--gutter); bottom: 84px; }   /* thumbnails clear of SOUND */
+  .pd__thumbs { grid-column: 1 / -1; justify-self: center; }   /* centred: clear of BMO */
+}
+@media (min-width: 761px) and (max-width: 1200px) {
+  .pd__info { padding-left: calc(var(--gutter) + 112px); }       /* BMO stands bottom-left */
+  .pd__next { bottom: auto; top: calc(var(--gutter) + 34px); }
+}
+/* portrait tablets: two columns (name + stack | info), pictures under them */
+@media (min-width: 761px) and (max-width: 1100px) and (orientation: portrait) {
+  .pd__info { grid-template-columns: 1fr 1.5fr; }
+  .pd__info > :nth-child(1) { grid-column: 1; grid-row: 1; }
+  .pd__info > :nth-child(2) { grid-column: 2; grid-row: 1 / span 2; }
+  .pd__info > :nth-child(3) { grid-column: 1; grid-row: 2; }
+  .pd__thumbs { grid-row: 3; }
+}
+/* phones: compact, one column, clear of BMO and the SOUND button (pictures: swipe the screen) */
 @media (max-width: 760px) {
-  .pd__info { grid-template-columns: 1fr; gap: 18px; padding: 0 var(--gutter); bottom: 4vh; }
-  .pd__thumbs button { width: 52px; }
+  .pd__info { grid-template-columns: 1fr; gap: 12px; padding: 0 var(--gutter); bottom: 100px; }
+  .pd__label { margin-bottom: 6px; font-size: 12px; }
+  .pd__name { font-size: 22px; }
+  .pd__context { margin-top: 6px; font-size: 11px; }
+  .pd__text { font-size: 13px; max-width: none; }
+  .pd__story { margin-top: 6px; font-size: 12px; line-height: 1.4; max-width: none; }
+  .pd__links { margin-top: 8px; font-size: 13px; }
+  .pd__built { max-width: none; gap: 2px 12px; }
+  .pd__thumbs { display: none; }
+  .pd::before { height: 62svh; }
+  /* phones: the info fills the bottom, so it sits under the top bar */
+  .pd__next { bottom: auto; top: calc(var(--gutter) + 34px); }
+  .pd__next-name { font-size: 16px; }
 }
 
 /* Project page: a copy of the home showcase's text, revealed while closing */
@@ -830,6 +874,10 @@ html[data-cursor-big="on"] .cursor__ring > span { width: var(--cursor-big); heig
   font: 11px/1 var(--font-mono); letter-spacing: 0.14em; text-transform: uppercase;
 }
 .ab__top .brand, .ab__top .link { color: inherit; }
+.ab__top::before {
+  content: ""; position: fixed; z-index: -1; left: 0; right: 0; top: 0; height: calc(var(--gutter) + 52px); pointer-events: none;
+  background: linear-gradient(to bottom, #0b0b0b 55%, rgba(11, 11, 11, 0));
+}
 .ab__label { margin: 0 0 16px; font: 11px/1 var(--font-mono); letter-spacing: 0.14em; text-transform: uppercase; color: rgba(236, 233, 226, 0.55); }
 .ab__label span { color: #ece9e2; margin-right: 8px; }
 /* 1. about me: the figure in the middle, title left, text right */
@@ -880,9 +928,21 @@ html[data-cursor-big="on"] .cursor__ring > span { width: var(--cursor-big); heig
 .ab :is(.ab__do-text) {
   transform: perspective(1200px) rotateY(calc(var(--mx) * -5deg)) rotateX(calc(var(--my) * 4deg)) translate3d(calc(var(--mx) * -14px), calc(var(--my) * 8px), 0);
 }
-@media (max-width: 760px) {
+@media (max-width: 760px), (max-width: 1100px) and (orientation: portrait) {
   .ab__do-text { max-width: none; align-self: start; padding-top: 6svh; }
   .ab__do-tabs { grid-template-columns: repeat(3, 1fr); row-gap: 4px; }
+  .ab__do-tabs { margin-bottom: 196px; }   /* above BMO (bottom-left) */
+  /* tighter gaps between sections (phones / portrait tablets) */
+  /* the room kept under the tabs (BMO) is empty once "What I do" scrolls away: the logo row
+     moves up into it */
+  /* (".ab " in front: these must beat the base rules, which come later in this file) */
+  .ab .ab__stack { padding: 0 var(--gutter); margin-top: -170px; }
+  .ab .ab__exp { padding: 3svh var(--gutter) 2svh; }
+  .ab .ab__exp-grid { margin-top: 5svh; }
+  .ab .ab__timeline li { min-height: 34svh; }
+  .ab .ab__timeline li:last-child { min-height: 0; padding-bottom: 6svh; }
+  .ab .ab__contact { min-height: 0; }
+  .ab .ab__contact .ab__do-head { padding-top: 4svh; }
 }
 /* text appears with a glitch: slices jump, red/blue split, then it settles */
 .gx-text { animation: gx-text-in 0.75s steps(1) backwards; } /* backwards: once done, the tilt transform applies again */
@@ -919,12 +979,13 @@ html[data-cursor-big="on"] .cursor__ring > span { width: var(--cursor-big); heig
 .ab__form button:hover { background: #fff; }
 .ab__form-foot p { margin: 0; font-size: 13px; color: rgba(236, 233, 226, 0.55); }
 .ab__form-foot a { color: #ece9e2; }
-.ab__contact-tv { position: relative; height: min(70svh, 640px); }
+.ab__contact-tv { position: relative; height: min(56svh, 540px); }
 .ab__tv3d { position: absolute; inset: 0; cursor: grab; touch-action: pan-y; }
 .ab__tv3d[data-drag="on"] { cursor: grabbing; }
 .ab__tv-hint { margin: 0; font: 11px/1 var(--font-mono); letter-spacing: 0.14em; text-transform: uppercase; color: rgba(236, 233, 226, 0.45); pointer-events: none; white-space: nowrap; }
 /* credits + the TV's hint on one line; */
-.ab__contact-foot { display: flex; justify-content: space-between; align-items: flex-start; gap: 4vw; padding: 2svh 0 16svh; }
+/* bottom room: the page ends above the BMO chat button (fixed bottom-left), so CREDITS stays clickable */
+.ab__contact-foot { display: flex; justify-content: space-between; align-items: flex-start; gap: 4vw; padding: 2svh 0 max(12svh, 192px); }
 .ab__contact-foot .ab__tv-hint { padding-top: 6px; }
 /* the form appears with a glitch once the particles have drawn it (data-live set by the stage) */
 .ab__form[data-live="off"] { visibility: hidden; }
@@ -934,9 +995,29 @@ html[data-cursor-big="on"] .cursor__ring > span { width: var(--cursor-big); heig
 .ab :is(.ab__form, .ab__contact-tv) {
   transform: perspective(1200px) rotateY(calc(var(--mx) * -5deg)) rotateX(calc(var(--my) * 4deg)) translate3d(calc(var(--mx) * -14px), calc(var(--my) * 8px), 0);
 }
-@media (max-width: 760px) {
-  .ab__contact-grid { grid-template-columns: 1fr; padding-top: 4svh; }
-  .ab__contact-tv { order: -1; height: 42svh; }
+/* short desktop / landscape screens: a tighter form so the title, form and TV fit the last screen */
+@media (min-width: 761px) and (max-height: 860px) {
+  .ab__contact-title { font-size: clamp(2.2rem, 4vw, 3.4rem); margin-bottom: 8px; }
+  .ab__contact-body { margin-bottom: 14px; }
+  .ab__form { gap: 12px; }
+  .ab__form label { gap: 4px; }
+  .ab__form :is(input, textarea) { padding: 4px 0 6px; font-size: 16px; }
+  .ab__form textarea { height: 64px; resize: none; }
+  .ab__contact-tv { height: min(50svh, 540px); }
+  .ab__do-head { padding-top: 10svh; }
+}
+@media (max-width: 760px), (max-width: 1100px) and (orientation: portrait) {
+  .ab__contact-grid { grid-template-columns: 1fr; padding-top: 2svh; gap: 2svh; align-items: start; }
+  .ab__contact-tv { order: -1; height: 30svh; }
+  .ab__contact-title { font-size: clamp(2rem, 7vw, 3.2rem); margin-bottom: 8px; }
+  .ab__contact-body { margin-bottom: 12px; font-size: 14px; }
+  .ab__form { gap: 12px; max-width: none; }
+  .ab__form label { gap: 4px; }
+  .ab__form :is(input, textarea) { padding: 4px 0 6px; font-size: 16px; }
+  .ab__form textarea { height: 64px; resize: none; }
+  .ab__form button { padding: 10px 18px 9px; font-size: 17px; }
+  /* the page ends just above BMO (bottom-left; tablets: it stands higher) */
+  .ab__contact-foot { padding: 14px 0 196px; }
 }
 /* 3. experience */
 .ab__exp { padding: 18svh var(--gutter) 24svh; }
@@ -953,6 +1034,8 @@ html[data-cursor-big="on"] .cursor__ring > span { width: var(--cursor-big); heig
 .ab__timeline { list-style: none; margin: 0; padding: 0 0 0 28px; border-left: 1px solid rgba(236, 233, 226, 0.18); }
 .ab__timeline li { position: relative; min-height: 46svh; padding-top: 6svh; opacity: 0.35; transition: opacity 0.5s ease; }
 .ab__timeline li[data-on="true"] { opacity: 1; }
+/* readable when the falling TV (the white one too) passes behind the text */
+.ab__timeline :is(h3, .ab__where, .ab__detail, .ab__when) { text-shadow: 0 1px 3px rgba(0, 0, 0, 0.95), 0 0 16px rgba(0, 0, 0, 0.85), 0 0 30px rgba(0, 0, 0, 0.6); }
 .ab__timeline li::before {
   content: ""; position: absolute; left: -32px; top: calc(6svh + 4px); width: 7px; height: 7px; border-radius: 50%;
   background: #0b0b0b; border: 1px solid rgba(236, 233, 226, 0.5); transition: background 0.4s ease;
@@ -962,19 +1045,41 @@ html[data-cursor-big="on"] .cursor__ring > span { width: var(--cursor-big); heig
 .ab__timeline h3 { margin: 10px 0 0; font: 700 clamp(1.5rem, 2.4vw, 2.2rem)/1.1 var(--font-sans); letter-spacing: -0.02em; }
 .ab__where { margin: 8px 0 0; font: 12px/1.4 var(--font-mono); letter-spacing: 0.06em; color: rgba(236, 233, 226, 0.6); }
 .ab__detail { margin: 12px 0 0; max-width: 42ch; font-size: 15px; line-height: 1.5; color: rgba(236, 233, 226, 0.72); }
-@media (max-width: 760px) {
+@media (max-width: 760px), (max-width: 1100px) and (orientation: portrait) {
   .ab__me { grid-template-columns: 1fr; padding-top: 60svh; }
-  .ab__portrait { height: 70svh; bottom: auto; }
   .ab__me-right { justify-self: start; }
+  /* the text sits over the figure's lower half: keep it readable */
+  .ab__me :is(.ab__title, .ab__body, .ab__links, .ab__label) { text-shadow: 0 1px 3px rgba(0, 0, 0, 0.95), 0 0 18px rgba(0, 0, 0, 0.9); }
   .ab__name { white-space: normal; }
+}
+/* short phones (iPhone SE): tighter still, so the TV stays in view with the form */
+@media (max-width: 760px) and (max-height: 640px) {
+  .ab__contact-grid { padding-top: 0; gap: 8px; }
+  .ab__contact-tv { height: 20svh !important; }
+  .ab__contact-title { font-size: 1.8rem; }
+  .ab__form { gap: 7px; }
+  .ab__form :is(input, textarea) { padding: 2px 0 4px; }
+  .ab__form textarea { height: 44px; }
+  .ab__form button { padding: 8px 16px 7px; }
+  .ab__contact-foot { padding-top: 8px; }
+}
+@media (max-width: 760px) {
+  .ab__do-tabs { margin-bottom: 104px; }
+  .ab .ab__stack { margin-top: -88px; }
+  .ab__contact-tv { height: 22svh; }
+  .ab__contact-body { display: none; }
+  .ab__contact-foot { padding-bottom: 96px; }
   .ab__exp-grid { grid-template-columns: 1fr; }
-  .ab__exp-year { top: 8svh; height: 26svh; z-index: 2; background: #0b0b0b; }
-  .ab__year { height: 20svh; }
+  /* the year: a big faint watermark behind the timeline (no black block) */
+  .ab__exp-year { top: 14svh; height: 30svh; z-index: 0; opacity: 0.4; pointer-events: none; margin-bottom: -30svh; }
+  .ab__year { height: 26svh; }
+  .ab__yearcap { display: none; }
+  .ab__timeline { position: relative; z-index: 1; }
 }
 
 
 /* home: no margin collapsing, so <main> is 2 screens and the showcase stays pinned */
-.home { display: flow-root; min-height: 200svh; }
+.home { display: flow-root; min-height: 200lvh; }
 /* the showcase's texts glitch in (not on the way back from a project: data-calm) */
 .sc[data-labels="on"] .sc__fade { transition: none; }
 .sc[data-labels="on"]:not([data-calm]) .sc__fade { animation: gx-text-in 0.75s steps(1) backwards; }
@@ -1099,6 +1204,8 @@ html[data-cursor-big="on"] .cursor__ring > span { width: var(--cursor-big); heig
 /* the tech stack: just the particle logo row (StackCarousel.tsx) */
 .ab__stack { position: relative; z-index: 1; padding: 6svh var(--gutter); }
 .ab__stack-row { position: relative; width: calc(100% + 2 * var(--gutter)); margin: 0 calc(-1 * var(--gutter)); height: clamp(240px, 36svh, 360px); align-self: center; }
+@media (max-width: 1100px), (pointer: coarse) { .ab__stack-row { height: 150px; } }
+@media (max-width: 760px) { .ab__stack-row { height: 118px; } }
 .ab__stack-canvas, .ab__stack-names { position: absolute; inset: 0; width: 100%; height: 100%; display: block; }
 .ab__stack-canvas { cursor: grab; touch-action: pan-y; }
 .ab__stack-names { pointer-events: none; }
@@ -1106,21 +1213,25 @@ html[data-cursor-big="on"] .cursor__ring > span { width: var(--cursor-big); heig
 
 
 /* ---------- "Ask K" AI assistant (AskK.tsx): arcade button bottom-left, CRT chat window ---------- */
+/* BMO (the mascot) is the button */
 .askk-btn {
-  position: fixed; left: var(--gutter); bottom: 64px; z-index: 62;
-  display: inline-flex; align-items: center; gap: 8px; padding: 9px 14px 8px; cursor: pointer;
-  border: 2px solid #111; background: #ffd21f; color: #111; box-shadow: 3px 3px 0 #111;
-  font: 800 14px/1 var(--font-dot), var(--font-mono); letter-spacing: 0.08em; text-transform: uppercase;
-  transition: transform 0.12s steps(2), box-shadow 0.12s steps(2);
+  position: fixed; left: var(--gutter); bottom: 66px; z-index: 62;   /* above the corner texts */
+  display: grid; justify-items: center; gap: 0; padding: 0; border: 0; background: none; cursor: pointer;
 }
-.askk-btn:hover { transform: translate(-1px, -1px); box-shadow: 4px 4px 0 #111; }
-.askk-btn:active, .askk-btn[data-open="true"] { transform: translate(2px, 2px); box-shadow: 1px 1px 0 #111; }
-.askk-btn__coin { font-size: 10px; animation: ab-blink 1.1s steps(1) infinite; }
+.askk-btn__bmo { display: block; width: 96px; height: 112px; }
+.askk-btn__bmo canvas { display: block; width: 100%; height: 100%; }
+/* BMO says hi once per visit */
+.askk-hi {
+  position: fixed; left: calc(var(--gutter) + 88px); bottom: 150px; z-index: 62; margin: 0;
+  padding: 8px 11px; background: #fff; color: #111; border: 2px solid #111; box-shadow: 3px 3px 0 #111;
+  font: 700 12px/1.2 var(--font-mono); white-space: nowrap; animation: gx-text-in 0.45s steps(1) backwards;
+}
+.askk-hi::after { content: ""; position: absolute; left: -9px; bottom: 10px; border: 7px solid transparent; border-right-color: #111; border-left: 0; }
 @keyframes ab-blink { 50% { opacity: 0; } }
 .askk {
   --bg: #0c0c0f; --fg: #ece9e2; --soft: rgba(236, 233, 226, 0.55); --line: rgba(236, 233, 226, 0.16);
-  position: fixed; left: var(--gutter); bottom: 112px; z-index: 63;
-  width: min(380px, calc(100vw - 2 * var(--gutter))); height: min(500px, calc(100svh - 150px));
+  position: fixed; left: var(--gutter); bottom: 186px; z-index: 63;
+  width: min(380px, calc(100vw - 2 * var(--gutter))); height: min(480px, calc(100svh - 230px));
   display: grid; grid-template-rows: auto 1fr auto auto auto auto;
   background: var(--bg); color: var(--fg); border: 2px solid #ffd21f; box-shadow: 6px 6px 0 rgba(0, 0, 0, 0.45);
   font: 14px/1.5 var(--font-sans); overflow: hidden; animation: gx-text-in 0.45s steps(1) backwards;
@@ -1146,11 +1257,45 @@ html[data-cursor-big="on"] .cursor__ring > span { width: var(--cursor-big); heig
 .askk__form button:disabled { opacity: 0.4; cursor: default; }
 .askk__check:empty { display: none; }
 .askk__check { padding: 0 12px 6px; }
-.askk__note { margin: 0; padding: 0 12px 10px; font: 10px/1.4 var(--font-mono); letter-spacing: 0.04em; color: var(--soft); }
+.askk__note { margin: 0; padding: 0 12px 10px; font: 10px/1.4 var(--font-mono); letter-spacing: 0.04em; color: var(--soft); white-space: nowrap; }
+.askk__privacy-btn { color: inherit; text-decoration: underline; text-underline-offset: 2px; }
+.askk__privacy-btn:hover { color: #ffd21f; }
 .askk__note a { color: inherit; }
 /* phones: the button in the very corner (clear of thumbnails and texts), the chat nearly full width */
 @media (max-width: 760px) {
-  .askk-btn { bottom: 14px; padding: 7px 11px 6px; font-size: 12px; }
-  .askk { bottom: 58px; height: min(480px, calc(100svh - 120px)); }
+  .askk-btn { bottom: 8px; }
+  .askk-btn__bmo { width: 70px; height: 82px; }
+  .askk { bottom: 130px; height: min(460px, calc(100svh - 190px)); }
+  .askk-hi { left: calc(var(--gutter) + 64px); bottom: 104px; }
 }
-@media (prefers-reduced-motion: reduce) { .askk, .askk-btn__coin { animation: none; } }
+@media (prefers-reduced-motion: reduce) { .askk { animation: none; } }
+
+/* ---------- Hand mode (HandMode.tsx): webcam hand control, bottom-right ---------- */
+.hand-btn {
+  position: fixed; right: var(--gutter); bottom: 66px; z-index: 62; cursor: pointer;
+  display: inline-flex; align-items: center; gap: 7px; padding: 7px 11px 6px;
+  border: 2px solid #111; background: #ffd21f; color: #111; box-shadow: 3px 3px 0 #111;
+  font: 800 12px/1 var(--font-dot), var(--font-mono); letter-spacing: 0.08em; text-transform: uppercase;
+  transition: transform 0.12s steps(2), box-shadow 0.12s steps(2);
+}
+.hand-btn:hover { transform: translate(-1px, -1px); box-shadow: 4px 4px 0 #111; }
+.hand-btn__key { margin-left: 0.35em; padding: 0 0.35em; border: 1.5px solid currentColor; border-radius: 3px; font: inherit; font-size: 0.85em; line-height: 1.3; opacity: 0.7; }
+.hand-btn[aria-pressed="true"] { background: #4cff6a; transform: translate(2px, 2px); box-shadow: 1px 1px 0 #111; }
+/* every gesture emoji in the same colour emoji font, same width, so they line up */
+.hand-emoji { display: inline-block; width: 1.35em; text-align: center; font-family: "Apple Color Emoji", "Segoe UI Emoji", "Noto Color Emoji", sans-serif; font-style: normal; font-weight: 400; letter-spacing: 0; }
+.hand-panel__legend .hand-emoji { margin-right: 0.45em; font-size: 1.15em; }
+.hand-msg { position: fixed; right: var(--gutter); bottom: 108px; z-index: 62; max-width: 260px; margin: 0; padding: 8px 10px; background: #fff; color: #111; border: 2px solid #111; font: 600 12px/1.4 var(--font-mono); }
+.hand-panel { position: fixed; right: var(--gutter); bottom: 108px; z-index: 62; width: 200px; padding: 6px; background: #0c0c0f; color: #ece9e2; border: 2px solid #ffd21f; display: none; }
+.hand-panel[data-on="true"] { display: block; animation: gx-text-in 0.4s steps(1) backwards; }
+.hand-panel__view { position: relative; width: 192px; height: 144px; background: #000; overflow: hidden; }
+.hand-panel__view video, .hand-panel__view canvas { position: absolute; inset: 0; width: 100%; height: 100%; transform: scaleX(-1); object-fit: cover; }
+.hand-panel__view canvas { transform: none; }
+.hand-panel__g { position: absolute; right: 4px; top: 2px; font-size: 22px; }
+.hand-panel__legend { list-style: none; margin: 6px 0 0; padding: 0; font: 11px/1.5 var(--font-mono); }
+.hand-panel__note { margin: 6px 0 0; font: 9px/1.4 var(--font-mono); color: rgba(236, 233, 226, 0.55); }
+/* the pointer made by the hand: a ring that fills when you pinch; the site's own cursor is hidden */
+.hand-dot { position: fixed; left: 0; top: 0; z-index: 9998; width: 0; height: 0; opacity: 0; pointer-events: none; transition: opacity 0.2s ease; }
+.hand-dot::before { content: ""; position: absolute; left: -16px; top: -16px; width: 32px; height: 32px; border: 3px solid #ffd21f; border-radius: 50%; box-shadow: 0 0 0 2px #111, 0 0 14px rgba(255, 210, 31, 0.7); transition: transform 0.1s ease, background 0.1s ease; }
+.hand-dot--click::before { transform: scale(0.55); background: #ffd21f; }
+.hand-dot--down::before { transform: scale(0.65); background: #ffd21f; border-color: #ff3b3b; box-shadow: 0 0 0 2px #111, 0 0 16px rgba(255, 59, 59, 0.8); }
+@media (max-width: 1024px), (any-pointer: coarse) { .hand-btn, .hand-panel, .hand-msg { display: none; } }

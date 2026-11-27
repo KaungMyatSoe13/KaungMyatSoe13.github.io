@@ -8,7 +8,7 @@ export const aboutIntro = {
   role: "a full-stack developer.",
   body: [
     "22, based in Singapore, and I build for the web with modern frameworks: React, Next.js, TypeScript and Node, from the interface all the way to the API and the database.",
-    "I also build WordPress, Elementor and Shopify sites, custom plugins included, and I love learning AI, machine learning and deep learning. Always shipping, always learning.",
+    "I've also built 50+ WordPress, Elementor and Shopify sites, written custom plugins that now run on 50+ client sites, and set up AI automation for everyday workflows. I love learning AI, machine learning and deep learning. Always shipping, always learning.",
   ],
   // placeholder photo with the background cut out (transparent PNG); the original is me.jpg
   photo: "/about/me2-cut.webp",
@@ -40,7 +40,7 @@ export const experience: Experience[] = [
     year: "2026",
     title: "Web Developer",
     where: "Marketing agency, Singapore",
-    detail: "WordPress, Elementor and Shopify sites built from scratch to launch. Lots of plugins, a few custom ones of my own, and I deploy them live myself.",
+    detail: "50+ info and e-commerce sites on WordPress, Elementor and Shopify, from scratch to launch. My custom plugins now run on 50+ client sites, and I build AI automation for our internal workflows.",
     now: true,
   },
 ];
@@ -52,7 +52,7 @@ export const skills: Skill[] = [
   { name: "Discover", tagline: "Start with the right questions.", body: "Understanding the people, the goals and the problem before a single pixel or line of code.", icon: "discover" },
   { name: "Design", tagline: "From the first sketch.", body: "Wireframes to polished UI: layouts, type and colour that work on every screen size.", icon: "design" },
   { name: "Architect", tagline: "Plan the parts before building them.", body: "Choosing the stack and shaping the system: frontend, APIs, data and auth, built to grow.", icon: "architect" },
-  { name: "Build", tagline: "Turning plans into working software.", body: "Full-stack apps with React, Next.js, TypeScript and Node, plus WordPress, Elementor and Shopify sites with custom plugins.", icon: "build" },
+  { name: "Build", tagline: "Turning plans into working software.", body: "Full-stack apps with React, Next.js, TypeScript and Node, WordPress, Elementor and Shopify sites with custom plugins, and AI automation that takes the busywork out of a team's day.", icon: "build" },
   { name: "Launch", tagline: "Getting it into people's hands.", body: "Going live with fast loading, clean SEO and nothing left broken.", icon: "launch" },
   { name: "Maintain", tagline: "Keeping it healthy after launch.", body: "Fixes, updates and improvements, so the product keeps working as it grows.", icon: "maintain" },
 ];

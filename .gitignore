@@ -48,3 +48,12 @@ public/projects/kotobalab/shrine-photo.webp
 worker/node_modules
 worker/.wrangler
 worker/.dev.vars
+
+# temporary hand-tracking prototype
+public/hand-test/
+# MediaPipe files the site doesn't load (the bundle is only for the prototype above)
+public/mediapipe/vision_bundle.mjs
+public/mediapipe/wasm/vision_wasm_module_internal.*
+
+# licence unconfirmed: never commit
+public/projects/kotobalab/room.webp
