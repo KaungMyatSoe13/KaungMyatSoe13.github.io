@@ -8,7 +8,6 @@ import Music from "@/components/Music";
 import Loader from "@/components/Loader";
 import AskK from "@/components/AskK";
 import HandMode from "@/components/HandMode";
-import DevReport from "@/components/DevReport";
 import "./globals.css";
 
 const sans = Inter_Tight({ subsets: ["latin"], variable: "--font-sans", display: "swap" });
@@ -47,7 +46,6 @@ export default function RootLayout({ children }: Readonly<{ children: React.Reac
         <Music />
         <AskK />
         <HandMode />
-        <DevReport />
         <Loader />
       </body>
     </html>

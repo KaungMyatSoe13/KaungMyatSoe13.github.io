@@ -31,9 +31,9 @@ mascot (BMO) on every page, and webcam "Hand mode". First visit shows a 1 → 10
 **Published** (live = `main` at 0eef1b2, built and deployed fine): the arcade site, music, loader,
 About TV story, 3D project rooms, and the Ask K chat (Worker deployed on Cloudflare).
 
-**Backed up but NOT published** (2026-11-27: committed and pushed to `origin/arcade-showcase`, not
-`main`; publish only when the owner says "publish"; the chat Worker's new spam protections are
-also not deployed; remove `DevReport` before publishing):
+**Published 2026-11-27** for the owner's testing (pushed to `main`; `DevReport` removed). The chat
+Worker's new spam protections are **not deployed** yet (`cd worker && npm run deploy`, when the owner
+says "deploy"). What went out:
 - BMO as the chat button (`Bmo.tsx`, `public/ui/bmo.glb`), expressions, hover lines, one-line
   footer with a Cloudflare "Privacy" link.
 - Hand mode (`HandMode.tsx`, `src/lib/hand.ts`, `public/mediapipe/` ~22 MB (the unused
@@ -403,9 +403,8 @@ notes are history, not instructions. Big-picture map: `src/content/*` (data) →
   the desktop path copies the ink canvas into a texture every frame, which real iOS Safari does
   badly). Card wheel on touch follows the finger (`touch` in ArcadeShowcase: STEP_PX per card,
   release snaps with a flick carry of up to 2, swipe speed spins the cards; touches no longer start
-  the single-card spin drag). `DevReport.tsx` (root layout) sends errors/FPS to a log receiver on
-  the Mac (port 3999) ONLY when the site is opened from a local-network IP: remove before publishing
-  if not wanted.
+  the single-card spin drag). (A `DevReport` helper that sent errors/FPS from a phone to the Mac was removed at publishing;
+  it is in git history.)
 - Real-iPhone log (iOS 27, 440×756 @3x): no JS errors; home 42–52 fps, projects ~60, About froze
   8.3 s on first showing the TV (shader compile on iOS). Fixes: AboutTv `renderer.compileAsync`
   before the loader lets go; touch devices skip the three fall SHELLS (TV hides during the fall
