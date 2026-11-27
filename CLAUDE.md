@@ -459,6 +459,20 @@ notes are history, not instructions. Big-picture map: `src/content/*` (data) →
   swaps to the animated one after hydration (the loader covers it). So everything above about
   About's particles / TV on phones and tablets now applies to desktop only.
 
+- Contact form email (owner chose Gmail SMTP, 2026-11-28): both forms (AboutStory `Contact`,
+  AboutStatic `StaticContact`) POST to the Worker's `/contact` (`src/lib/contact.ts`); the Worker
+  sends through smtp.gmail.com:465 with `worker-mailer` (npm, exact 1.3.1) from and to SMTP_USER,
+  Reply-To = the visitor. Secrets SMTP_USER / SMTP_PASS (a Gmail APP password; the owner types it
+  with `npx wrangler secret put`, never in chat or a file). Guards: the chat's rate limiter, 5 a
+  day per hashed IP, 60 a day site-wide (KV), a hidden `website` bot-trap field, control
+  characters stripped (no header injection), max 3 links. Not set up / send failed / offline →
+  the form falls back to opening the visitor's mail app (the old mailto).
+  reCAPTCHA v3 (owner): invisible, loaded on the form's first focus (`loadRecaptcha` in
+  src/lib/contact.ts), token sent as `recaptcha`, the Worker checks it (score ≥ 0.5, action
+  "contact") ONLY when the secret RECAPTCHA_SECRET is set; the site key is the repo variable
+  NEXT_PUBLIC_RECAPTCHA_SITEKEY (deploy.yml). The badge is hidden (`.grecaptcha-badge`) and the
+  required "protected by reCAPTCHA" line shows under the form instead (only when a key is set).
+
 ## Page switch (glitch)
 
 - `src/lib/tv.ts` + `TvLink.tsx` (names kept): showcase "About" and About "Selected work" play

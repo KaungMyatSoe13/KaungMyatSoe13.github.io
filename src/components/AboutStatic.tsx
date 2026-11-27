@@ -7,6 +7,7 @@ import { stack } from "@/content/stack";
 import { site } from "@/content/site";
 import { tvOn } from "@/lib/tv";
 import { lightInk } from "@/lib/stage";
+import { RECAPTCHA_KEY, loadRecaptcha, openMailApp, sendContact } from "@/lib/contact";
 import { drawIcon } from "./AboutStory";
 import Credits from "./Credits";
 import KLogo from "./KLogo";
@@ -31,15 +32,19 @@ function Icon({ icon }: { icon: SkillIcon }) {
   return <canvas ref={ref} className="abs__icon" width={1000} height={720} aria-hidden="true" />;
 }
 
-/** The contact form without the TV: submit opens the visitor's mail app (the site is static). */
+/** The contact form without the TV: sent through the Worker (Gmail SMTP); the mail app if that fails. */
 function StaticContact() {
-  const [sent, setSent] = useState(false);
-  const onSubmit = (e: React.FormEvent<HTMLFormElement>) => {
+  const [status, setStatus] = useState<"" | "sending" | "sent" | "mailapp">("");
+  const [err, setErr] = useState("");
+  const onSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
-    const f = new FormData(e.currentTarget);
-    const name = String(f.get("name")), from = String(f.get("email")), msg = String(f.get("message"));
-    window.location.href = `mailto:${site.email}?subject=${encodeURIComponent(`Hello from ${name}`)}&body=${encodeURIComponent(`${msg}\n\n${name}\n${from}`)}`;
-    setSent(true);
+    if (status === "sending") return;
+    const form = e.currentTarget, f = new FormData(form);
+    setStatus("sending"); setErr("");
+    const r = await sendContact(f);
+    if (r.ok) { setStatus("sent"); form.reset(); return; }
+    if (r.fallback) { openMailApp(String(f.get("name")), String(f.get("email")), String(f.get("message"))); setStatus("mailapp"); return; }
+    setStatus(""); setErr(r.message);
   };
   return (
     <section id="contact" className="abs__sec abs__contact" aria-labelledby="abs-contact">
@@ -47,16 +52,22 @@ function StaticContact() {
         <p className="ab__label"><span>(04)</span> Contact</p>
         <p className="abs__note">{contact.note}</p>
       </div>
-      <form className="ab__form abs__form" onSubmit={onSubmit}>
+      <form className="ab__form abs__form" onFocus={() => void loadRecaptcha()} onSubmit={onSubmit}>
         <h2 id="abs-contact" className="ab__contact-title">{contact.title}</h2>
         <p className="ab__contact-body">{contact.body}</p>
         <label><span>Name</span><input name="name" required autoComplete="name" /></label>
         <label><span>Email</span><input name="email" type="email" required autoComplete="email" /></label>
-        <label><span>Message</span><textarea name="message" rows={4} required /></label>
+        <label><span>Message</span><textarea name="message" rows={4} required maxLength={4000} /></label>
+        {/* hidden from people; bots fill it in and are ignored */}
+        <label className="hp" aria-hidden="true"><span>Website</span><input name="website" tabIndex={-1} autoComplete="off" /></label>
         <div className="ab__form-foot">
-          <button type="submit">▶ Send</button>
-          <p aria-live="polite">{sent ? "Your mail app should be open. If not, " : "Or write to "}<a href={`mailto:${site.email}`}>{site.email}</a></p>
+          <button type="submit" disabled={status === "sending"}>{status === "sending" ? "Sending…" : "▶ Send"}</button>
+          <p aria-live="polite">
+            {err ? <>{err} </> : status === "sent" ? <>Sent! K will get back to you soon. </> : status === "mailapp" ? <>Your mail app should be open. If not, write to </> : <>Or write to </>}
+            <a href={`mailto:${site.email}`}>{site.email}</a>
+          </p>
         </div>
+        {RECAPTCHA_KEY && <p className="abs__rc">This site is protected by reCAPTCHA and the Google <a href="https://policies.google.com/privacy" target="_blank" rel="noopener noreferrer">Privacy Policy</a> and <a href="https://policies.google.com/terms" target="_blank" rel="noopener noreferrer">Terms of Service</a> apply.</p>}
       </form>
       <div className="abs__foot"><Credits /></div>
     </section>

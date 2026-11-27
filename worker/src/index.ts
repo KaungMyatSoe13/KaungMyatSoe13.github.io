@@ -9,8 +9,15 @@
  * kept under the free allowance); a Turnstile check starts a conversation and the Worker hands
  * back a signed 30-minute pass; last 10 turns, 600 characters per message; only the site may call.
  * Misuse (rule-changing attempts, off-topic jobs, junk, repeats) is answered before the model runs.
+ *
+ * POST /contact { name, email, message, website } → { ok: true }: the About page's contact form,
+ * sent to K's inbox through Gmail SMTP (worker-mailer). Reply-To is the visitor, so "Reply"
+ * answers them. Guards: the same rate limiter, CONTACT_IP_DAILY per visitor and CONTACT_DAILY for
+ * the site a day (KV), a hidden "website" field bots fill in, short fields, few links, and Google
+ * reCAPTCHA v3 (score ≥ RECAPTCHA_MIN for the "contact" action) once RECAPTCHA_SECRET is set.
  */
 import knowledge from "./knowledge.md";
+import { WorkerMailer } from "worker-mailer";
 
 interface Env {
   AI: { run(model: string, input: Record<string, unknown>): Promise<ReadableStream<Uint8Array> | { response?: string }> };
@@ -19,6 +26,13 @@ interface Env {
   DAILY_CAP: string;
   LIMITER: { limit(o: { key: string }): Promise<{ success: boolean }> };
   KV: KVNamespace;
+  /** The contact form's Gmail (secrets: `npx wrangler secret put SMTP_USER` / `SMTP_PASS`,
+   *  the password is a Gmail app password, never the account password). */
+  SMTP_USER?: string;
+  SMTP_PASS?: string;
+  /** Google reCAPTCHA v3 secret for the contact form (`npx wrangler secret put RECAPTCHA_SECRET`);
+   *  without it the check is skipped. */
+  RECAPTCHA_SECRET?: string;
 }
 
 /** A free Workers AI model. Swap it here if you want a different one (see developers.cloudflare.com/workers-ai/models). */
@@ -59,6 +73,64 @@ function screen(text: string, history: Msg[]): "ok" | "off" | "junk" {
   if (prev.includes(t)) return "junk";
   return "ok";
 }
+const CONTACT_IP_DAILY = 5, CONTACT_DAILY = 60;
+/** reCAPTCHA v3 scores 0 (bot) … 1 (person); Google suggests 0.5 to start */
+const RECAPTCHA_MIN = 0.5;
+async function recaptchaOk(secret: string, token: unknown, ip: string) {
+  if (typeof token !== "string" || !token) return false;
+  const form = new FormData();
+  form.append("secret", secret); form.append("response", token); form.append("remoteip", ip);
+  try {
+    const r = await fetch("https://www.google.com/recaptcha/api/siteverify", { method: "POST", body: form });
+    const d = (await r.json()) as { success?: boolean; score?: number; action?: string };
+    return !!d.success && d.action === "contact" && (d.score ?? 0) >= RECAPTCHA_MIN;
+  } catch { return false; }
+}
+/** one line, no control characters (they could add mail headers), at most `max` characters */
+const line = (v: unknown, max: number) => (typeof v === "string" ? v.replace(/[\u0000-\u001f\u007f]+/g, " ").trim().slice(0, max) : "");
+
+async function contact(req: Request, env: Env, cors: Record<string, string>, ip: string): Promise<Response> {
+  let b: Record<string, unknown>;
+  try { b = await req.json(); } catch { return json({ error: "bad_request" }, 400, cors); }
+  // the hidden field: people never see it, form-filling bots do. They get a quiet "ok".
+  if (typeof b.website === "string" && b.website.trim()) return json({ ok: true }, 200, cors);
+  const name = line(b.name, 80), email = line(b.email, 160);
+  const message = typeof b.message === "string" ? b.message.replace(/\r\n?/g, "\n").trim().slice(0, 4000) : "";
+  if (!name || !/^[^\s@<>"(),;:]+@[^\s@<>"(),;:]+\.[^\s@<>"(),;:]{2,}$/.test(email) || message.length < 2)
+    return json({ error: "invalid", message: "Please fill in your name, a valid email and a message." }, 400, cors);
+  if ((message.match(/https?:\/\//g) ?? []).length > 3) return json({ error: "invalid", message: "Too many links in one message. Email K directly instead." }, 400, cors);
+  if (!env.SMTP_USER || !env.SMTP_PASS) return json({ error: "not_set_up" }, 503, cors);
+  if (env.RECAPTCHA_SECRET && !(await recaptchaOk(env.RECAPTCHA_SECRET, b.recaptcha, ip)))
+    return json({ error: "verify", message: "Couldn't confirm you're human. Please email K directly." }, 403, cors);
+
+  // a few a day per visitor (IP hashed), and a ceiling for the whole site
+  const day = new Date().toISOString().slice(0, 10);
+  const ipKey = `mail:${day}:${await sha(ip + day)}`, siteKey = `mailcount:${day}`;
+  const [mine, all] = await Promise.all([env.KV.get(ipKey), env.KV.get(siteKey)]).then((v) => v.map((x) => Number(x ?? 0)));
+  if (mine >= CONTACT_IP_DAILY || all >= CONTACT_DAILY) return json({ error: "limit", message: "That's a lot of messages for today. Please email K directly." }, 429, cors);
+
+  try {
+    await WorkerMailer.send(
+      { host: "smtp.gmail.com", port: 465, secure: true, authType: "plain", credentials: { username: env.SMTP_USER, password: env.SMTP_PASS } },
+      {
+        from: { name: "KFOLIO contact form", email: env.SMTP_USER },
+        to: env.SMTP_USER,
+        reply: { name, email },
+        subject: `Portfolio message from ${name}`,
+        text: `${message}\n\n--\n${name} <${email}>\nSent from the contact form on your portfolio, ${new Date().toUTCString()}.\nPress Reply to answer them.`,
+      },
+    );
+  } catch (e) {
+    console.error("[contact]", e);
+    return json({ error: "send_failed" }, 502, cors);
+  }
+  await Promise.all([
+    env.KV.put(ipKey, String(mine + 1), { expirationTtl: 60 * 60 * 48 }),
+    env.KV.put(siteKey, String(all + 1), { expirationTtl: 60 * 60 * 48 }),
+  ]);
+  return json({ ok: true }, 200, cors);
+}
+
 async function sha(s: string) {
   const d = await crypto.subtle.digest("SHA-256", new TextEncoder().encode(s));
   return btoa(String.fromCharCode(...new Uint8Array(d))).slice(0, 22);
@@ -134,12 +206,13 @@ export default {
       : {};
     if (req.method === "OPTIONS") return new Response(null, { status: cors["access-control-allow-origin"] ? 204 : 403, headers: cors });
     const url = new URL(req.url);
-    if (req.method !== "POST" || url.pathname !== "/chat") return json({ error: "not_found" }, 404, cors);
+    if (req.method !== "POST" || (url.pathname !== "/chat" && url.pathname !== "/contact")) return json({ error: "not_found" }, 404, cors);
     if (!cors["access-control-allow-origin"]) return json({ error: "forbidden" }, 403, cors);
 
     const ip = req.headers.get("cf-connecting-ip") ?? "unknown";
     const { success } = await env.LIMITER.limit({ key: ip });
     if (!success) return json({ error: "slow_down", message: "Whoa, too fast! Give it a minute and try again." }, 429, cors);
+    if (url.pathname === "/contact") return contact(req, env, cors, ip);
 
     let body: { messages?: unknown; turnstile?: unknown; pass?: unknown; page?: unknown };
     try { body = await req.json(); } catch { return json({ error: "bad_request" }, 400, cors); }

@@ -1359,3 +1359,12 @@ html[data-ios-safari] .ink-stage, html[data-ios-safari] .sc { height: 100lvh; }
   .abs__me { grid-template-columns: minmax(0, 0.9fr) minmax(0, 1.1fr); align-items: end; }
   .abs__photo { max-height: 70svh; }
 }
+
+/* the contact form's hidden bot trap (out of sight, not display:none: some bots skip hidden fields) */
+.ab__form .hp { position: absolute; left: -9999px; width: 1px; height: 1px; overflow: hidden; }
+.ab__form button:disabled { opacity: 0.6; cursor: progress; }
+/* reCAPTCHA v3: its floating badge would sit on the Hand mode button / Next project; Google allows
+   hiding it when this notice is shown with the form instead */
+.grecaptcha-badge { visibility: hidden; }
+.abs__rc { margin: 4px 0 0; max-width: 52ch; font-size: 11px; line-height: 1.5; color: rgba(236, 233, 226, 0.45); }
+.abs__rc a { color: rgba(236, 233, 226, 0.7); }

@@ -12,6 +12,7 @@ import TvLink from "./TvLink";
 import { tvOn } from "@/lib/tv";
 import { loading } from "@/lib/loading";
 import { aboutTv } from "@/lib/aboutTv";
+import { RECAPTCHA_KEY, loadRecaptcha, openMailApp, sendContact } from "@/lib/contact";
 import { lightInk } from "@/lib/stage";
 import AboutTv from "./AboutTv";
 
@@ -935,20 +936,24 @@ function CrtBackground() {
 /** (05) Contact: a form beside an old TV that shows what you type. */
 function Contact() {
   const screen = { current: aboutTv.screen };
-  const [sent, setSent] = useState(false);
+  const [status, setStatus] = useState<"" | "sending" | "sent" | "mailapp">("");
+  const [err, setErr] = useState("");
   const onInput = (e: React.FormEvent<HTMLFormElement>) => {
     const f = new FormData(e.currentTarget);
     screen.current.name = String(f.get("name") ?? "");
     screen.current.msg = String(f.get("message") ?? "");
     if (screen.current.state === "sent") screen.current.state = "idle";
   };
-  const onSubmit = (e: React.FormEvent<HTMLFormElement>) => {
+  const onSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
-    const f = new FormData(e.currentTarget);
-    const name = String(f.get("name")), from = String(f.get("email")), msg = String(f.get("message"));
-    screen.current.state = "sending";
-    const href = `mailto:${site.email}?subject=${encodeURIComponent(`Hello from ${name}`)}&body=${encodeURIComponent(`${msg}\n\n${name}\n${from}`)}`;
-    window.setTimeout(() => { window.location.href = href; screen.current.state = "sent"; setSent(true); }, 1100);
+    if (status === "sending") return;
+    const form = e.currentTarget, f = new FormData(form);
+    screen.current.state = "sending"; setStatus("sending"); setErr("");
+    // the TV shows SENDING for at least a moment, however fast the mail goes
+    const [r] = await Promise.all([sendContact(f), new Promise((res) => window.setTimeout(res, 900))]);
+    if (r.ok) { screen.current.state = "sent"; setStatus("sent"); form.reset(); screen.current.name = ""; screen.current.msg = ""; return; }
+    if (r.fallback) { openMailApp(String(f.get("name")), String(f.get("email")), String(f.get("message"))); screen.current.state = "sent"; setStatus("mailapp"); return; }
+    screen.current.state = "idle"; setStatus(""); setErr(r.message);
   };
   return (
     <section id="contact" className="ab__contact" aria-labelledby="ab-contact">
@@ -957,16 +962,22 @@ function Contact() {
         <p className="ab__do-note">{contact.note}</p>
       </div>
       <div className="ab__contact-grid">
-        <form className="ab__form" onInput={onInput} onSubmit={onSubmit}>
+        <form className="ab__form" onInput={onInput} onFocus={() => void loadRecaptcha()} onSubmit={onSubmit}>
           <h2 id="ab-contact" className="ab__contact-title">{contact.title}</h2>
           <p className="ab__contact-body">{contact.body}</p>
           <label><span>Name</span><input name="name" required autoComplete="name" /></label>
           <label><span>Email</span><input name="email" type="email" required autoComplete="email" /></label>
-          <label><span>Message</span><textarea name="message" rows={4} required /></label>
+          <label><span>Message</span><textarea name="message" rows={4} required maxLength={4000} /></label>
+          {/* hidden from people; bots fill it in and are ignored */}
+          <label className="hp" aria-hidden="true"><span>Website</span><input name="website" tabIndex={-1} autoComplete="off" /></label>
           <div className="ab__form-foot">
-            <button type="submit">▶ Send</button>
-            <p aria-live="polite">{sent ? "Your mail app should be open. If not, " : "Or write to "}<a href={`mailto:${site.email}`}>{site.email}</a></p>
+            <button type="submit" disabled={status === "sending"}>{status === "sending" ? "Sending…" : "▶ Send"}</button>
+            <p aria-live="polite">
+              {err ? <>{err} </> : status === "sent" ? <>Sent! K will get back to you soon. </> : status === "mailapp" ? <>Your mail app should be open. If not, write to </> : <>Or write to </>}
+              <a href={`mailto:${site.email}`}>{site.email}</a>
+            </p>
           </div>
+          {RECAPTCHA_KEY && <p className="abs__rc">This site is protected by reCAPTCHA and the Google <a href="https://policies.google.com/privacy" target="_blank" rel="noopener noreferrer">Privacy Policy</a> and <a href="https://policies.google.com/terms" target="_blank" rel="noopener noreferrer">Terms of Service</a> apply.</p>}
         </form>
         {/* the TV that fell from "What I do" lands here (AboutTv draws it; this is its spot and drag area) */}
         <div className="ab__contact-tv">
