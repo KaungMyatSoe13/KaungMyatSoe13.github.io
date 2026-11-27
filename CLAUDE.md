@@ -151,7 +151,8 @@ notes are history, not instructions. Big-picture map: `src/content/*` (data) →
   WebP in `public/landing/covers/`, `artOnly`: nothing printed over them); a game without one
   falls back to our painted genre scene (`src/lib/gameArt.ts`, title printed logo-style) (`floaters`, own scene `bscene` + `rtB`,
   composited in POST over the paper, under the ink and the arcade). They drift up and sway,
-  wrap round, and slip away from the mouse (spring back). Labels via `drawCardLabel` with a
+  wrap round, and slip away from the mouse (spring back; touch screens: a finger pushes them and
+  two unseen `pushers` wander across the screen so they keep dodging). Labels via `drawCardLabel` with a
   `CardText` (`projectCard(p)` for the project cards; `bigMax` lets short titles print big).
 - Music (`src/lib/music.ts` + `Music.tsx` in the root layout, so it carries across client page
   changes; Web Audio, gapless loops, crossfades; files in `public/audio/`, Street Fighter II

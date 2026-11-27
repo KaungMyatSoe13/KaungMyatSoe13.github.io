@@ -486,6 +486,15 @@ export default function ArcadeShowcase() {
     let ptrOn = false;                                     // the pointer is over the page
     const onPointer = (e: PointerEvent) => { tx = (e.clientX / innerWidth) * 2 - 1; ty = -((e.clientY / innerHeight) * 2 - 1); ptrOn = e.pointerType === "mouse" || e.pointerType === "pen"; };
     const onLeave = () => { ptrOn = false; };
+    // touch screens: a finger on the landing pushes the floating cards like the mouse does
+    let finger = false, fx = 0, fy = 0;
+    const onFinger = (e: PointerEvent) => {
+      if (e.pointerType !== "touch") return;
+      finger = e.type !== "pointerup" && e.type !== "pointercancel";
+      fx = (e.clientX / innerWidth) * 2 - 1; fy = -((e.clientY / innerHeight) * 2 - 1);
+    };
+    const FINGER = ["pointerdown", "pointermove", "pointerup", "pointercancel"] as const;
+    FINGER.forEach((k) => window.addEventListener(k, onFinger, { passive: true }));
     document.documentElement.addEventListener("pointerleave", onLeave);
     window.addEventListener("pointermove", onPointer, { passive: true });
 
@@ -1047,15 +1056,26 @@ export default function ArcadeShowcase() {
         const backOn = ps < 0.45;
         bscene.visible = backOn;
         const thb = Math.tan((bcam.fov / 2) * Math.PI / 180);
+        // who pushes them: the mouse; on touch screens (no mouse) the finger, and two unseen
+        // "pointers" wandering slowly across the screen, so the cards keep dodging like on desktop
+        const pushers: [number, number][] = [];
+        if (ptrOn) pushers.push([tx, ty]);
+        if (ana) {
+          if (finger) pushers.push([fx, fy]);
+          const w = t * 0.16;
+          pushers.push([Math.sin(w * 1.3) * 0.9, Math.sin(w * 0.9 + 1.2) * 0.9]);
+          pushers.push([Math.sin(w * 0.8 + 2.6) * 0.9, Math.sin(w * 1.1 + 4.1) * 0.9]);
+        }
         for (const f of backOn ? floaters : []) {
           if (!reduced) { f.x += f.vx * dt; f.y += f.vy * dt; f.rz += f.wz * dt; }
           // off the top: back in from the bottom, somewhere else across
           if (f.y > 1.4) { f.y = -1.4; f.x = rand(-1.1, 1.1); }
           if (f.x > 1.3) f.x = -1.3; else if (f.x < -1.3) f.x = 1.3;
           // the pointer pushes them away, a spring brings them back (screen units, -1..1)
-          const dx = (f.x + f.ox - tx) * aspect, dy = f.y + f.oy - ty, dist = Math.hypot(dx, dy) + 1e-4;
           const R = 0.3 + 0.12 * f.size;                            // big cards feel the pointer from further
-          if (ptrOn && dist < R && !reduced) {
+          if (!reduced) for (const [px, py] of pushers) {
+            const dx = (f.x + f.ox - px) * aspect, dy = f.y + f.oy - py, dist = Math.hypot(dx, dy) + 1e-4;
+            if (dist >= R) continue;
             const k = Math.pow(1 - dist / R, 2) * 14;
             f.pvx += (dx / dist / aspect) * k * dt; f.pvy += (dy / dist) * k * dt;
             f.kick += k * dt * (dx > 0 ? 1 : -1);                      // and it spins off a little
@@ -1133,6 +1153,7 @@ export default function ArcadeShowcase() {
       window.removeEventListener("scroll", onScroll);
       pin(false);
       window.removeEventListener("pointermove", onPointer);
+      FINGER.forEach((k) => window.removeEventListener(k, onFinger));
       document.documentElement.removeEventListener("pointerleave", onLeave);
     };
   }, [open]);
