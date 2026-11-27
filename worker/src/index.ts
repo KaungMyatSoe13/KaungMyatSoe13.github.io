@@ -89,6 +89,58 @@ async function recaptchaOk(secret: string, token: unknown, ip: string) {
 /** one line, no control characters (they could add mail headers), at most `max` characters */
 const line = (v: unknown, max: number) => (typeof v === "string" ? v.replace(/[\u0000-\u001f\u007f]+/g, " ").trim().slice(0, max) : "");
 
+const esc = (t: string) => t.replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" })[c]!);
+/** when it was sent, in Singapore time (where K is) */
+function sgTime() {
+  try { return new Date().toLocaleString("en-SG", { timeZone: "Asia/Singapore", weekday: "short", day: "numeric", month: "short", year: "numeric", hour: "numeric", minute: "2-digit" }) + " (SGT)"; }
+  catch { return new Date().toUTCString(); }
+}
+
+/**
+ * The email K receives, in the site's arcade look. Email-safe on purpose: tables, inline styles,
+ * system fonts only (no web fonts or images, which mail apps block). Everything the visitor typed
+ * is escaped. A plain-text copy goes with it for mail apps that don't show HTML.
+ */
+function contactEmail(name: string, email: string, message: string, origin: string) {
+  const when = sgTime(), site = (origin || "https://k-the.dev").replace(/^https?:\/\//, "");
+  const reply = `mailto:${encodeURIComponent(email)}?subject=${encodeURIComponent("Re: your message on " + site)}`;
+  const mono = "ui-monospace,SFMono-Regular,Menlo,Consolas,monospace", sans = "-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Helvetica,Arial,sans-serif";
+  const html = `<!doctype html><html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><meta name="color-scheme" content="light"><title>New message</title></head>
+<body style="margin:0;padding:0;background:#f2efe9;">
+<div style="display:none;max-height:0;overflow:hidden;">${esc(message.slice(0, 120))}</div>
+<table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background:#f2efe9;padding:32px 12px;">
+<tr><td align="center">
+<table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="max-width:560px;background:#ffffff;border:2px solid #0b0b0b;">
+  <tr><td style="background:#0b0b0b;padding:16px 22px;">
+    <table role="presentation" width="100%" cellpadding="0" cellspacing="0"><tr>
+      <td style="font-family:${mono};font-size:20px;font-weight:900;color:#ffd21f;letter-spacing:1px;">K<span style="color:#ffffff;font-size:13px;letter-spacing:3px;padding-left:10px;">KFOLIO</span></td>
+      <td align="right" style="font-family:${mono};font-size:11px;letter-spacing:2px;color:#ffd21f;">&#9654; NEW MESSAGE</td>
+    </tr></table>
+  </td></tr>
+  <tr><td style="padding:26px 22px 6px;">
+    <div style="font-family:${mono};font-size:11px;letter-spacing:2px;color:#8a8580;">FROM</div>
+    <div style="font-family:${sans};font-size:22px;font-weight:700;color:#0b0b0b;padding-top:6px;">${esc(name)}</div>
+    <div style="font-family:${sans};font-size:15px;padding-top:4px;"><a href="mailto:${esc(email)}" style="color:#0b0b0b;">${esc(email)}</a></div>
+    <div style="font-family:${mono};font-size:12px;color:#8a8580;padding-top:10px;">${esc(when)}</div>
+  </td></tr>
+  <tr><td style="padding:18px 22px 4px;">
+    <div style="font-family:${mono};font-size:11px;letter-spacing:2px;color:#8a8580;padding-bottom:8px;">MESSAGE</div>
+    <div style="background:#faf8f3;border-left:4px solid #ffd21f;padding:16px 18px;font-family:${sans};font-size:16px;line-height:1.6;color:#1a1a1a;">${esc(message).replace(/\n/g, "<br>")}</div>
+  </td></tr>
+  <tr><td style="padding:22px 22px 28px;">
+    <a href="${esc(reply)}" style="display:inline-block;background:#ffd21f;color:#0b0b0b;border:2px solid #0b0b0b;padding:12px 20px;font-family:${mono};font-size:14px;font-weight:700;letter-spacing:1px;text-decoration:none;">&#9654; REPLY TO ${esc(name.toUpperCase())}</a>
+    <div style="font-family:${sans};font-size:13px;color:#8a8580;padding-top:12px;">Or just press Reply: it goes to ${esc(email)}.</div>
+  </td></tr>
+  <tr><td style="border-top:1px solid #e6e1d8;padding:14px 22px;font-family:${mono};font-size:11px;color:#8a8580;letter-spacing:1px;">
+    Sent from the contact form on <a href="https://${esc(site)}" style="color:#8a8580;">${esc(site)}</a>
+  </td></tr>
+</table>
+</td></tr></table>
+</body></html>`;
+  const text = `NEW MESSAGE on ${site}\n\nFrom: ${name} <${email}>\nSent: ${when}\n\n${message}\n\n--\nPress Reply to answer ${name}.`;
+  return { html, text };
+}
+
 async function contact(req: Request, env: Env, cors: Record<string, string>, ip: string): Promise<Response> {
   let b: Record<string, unknown>;
   try { b = await req.json(); } catch { return json({ error: "bad_request" }, 400, cors); }
@@ -109,6 +161,7 @@ async function contact(req: Request, env: Env, cors: Record<string, string>, ip:
   const [mine, all] = await Promise.all([env.KV.get(ipKey), env.KV.get(siteKey)]).then((v) => v.map((x) => Number(x ?? 0)));
   if (mine >= CONTACT_IP_DAILY || all >= CONTACT_DAILY) return json({ error: "limit", message: "That's a lot of messages for today. Please email K directly." }, 429, cors);
 
+  const mail = contactEmail(name, email, message, req.headers.get("origin") ?? "");
   try {
     await WorkerMailer.send(
       { host: "smtp.gmail.com", port: 465, secure: true, authType: "plain", credentials: { username: env.SMTP_USER, password: env.SMTP_PASS } },
@@ -116,8 +169,9 @@ async function contact(req: Request, env: Env, cors: Record<string, string>, ip:
         from: { name: "KFOLIO contact form", email: env.SMTP_USER },
         to: env.SMTP_USER,
         reply: { name, email },
-        subject: `Portfolio message from ${name}`,
-        text: `${message}\n\n--\n${name} <${email}>\nSent from the contact form on your portfolio, ${new Date().toUTCString()}.\nPress Reply to answer them.`,
+        subject: `New message from ${name} | k-the.dev`,
+        text: mail.text,
+        html: mail.html,
       },
     );
   } catch (e) {
