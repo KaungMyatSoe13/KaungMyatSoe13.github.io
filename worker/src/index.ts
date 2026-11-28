@@ -5,9 +5,9 @@
  * Runs on Cloudflare Workers AI (a free open model, no API key, no card): on the free plan it
  * simply stops at the daily allowance instead of charging, so it can never cost money.
  * Guards: per visitor 8 messages a minute (LIMITER) and IP_DAILY a day (KV, IP hashed); per site
- * DAILY_CAP messages a UTC day (KV,
- * kept under the free allowance); a Turnstile check starts a conversation and the Worker hands
- * back a signed 30-minute pass; last 10 turns, 600 characters per message; only the site may call.
+ * DAILY_CAP messages a UTC day (KV, kept under the free allowance); a human check (reCAPTCHA v3,
+ * or Turnstile if set up) starts a conversation and the Worker hands back a signed 30-minute pass
+ * tied to the IP; last 10 turns, 600 characters per message; only the site may call.
  * Misuse (rule-changing attempts, off-topic jobs, junk, repeats) is answered before the model runs.
  *
  * POST /contact { name, email, message, website } → { ok: true }: the About page's contact form,
@@ -74,16 +74,18 @@ function screen(text: string, history: Msg[]): "ok" | "off" | "junk" {
   return "ok";
 }
 const CONTACT_IP_DAILY = 5, CONTACT_DAILY = 60;
-/** reCAPTCHA v3 scores 0 (bot) … 1 (person); Google suggests 0.5 to start */
-const RECAPTCHA_MIN = 0.5;
-async function recaptchaOk(secret: string, token: unknown, ip: string) {
+/** reCAPTCHA v3 scores 0 (bot) … 1 (person). The form uses Google's suggested 0.5 (a miss there
+ *  falls back to the mail app); the chat 0.3, so people on a VPN or a privacy browser still get in
+ *  (headless browsers score ~0, and a plain script has no token at all). */
+const RECAPTCHA_MIN = { contact: 0.5, chat: 0.3 } as const;
+async function recaptchaOk(secret: string, token: unknown, ip: string, action: keyof typeof RECAPTCHA_MIN) {
   if (typeof token !== "string" || !token) return false;
   const form = new FormData();
   form.append("secret", secret); form.append("response", token); form.append("remoteip", ip);
   try {
     const r = await fetch("https://www.google.com/recaptcha/api/siteverify", { method: "POST", body: form });
     const d = (await r.json()) as { success?: boolean; score?: number; action?: string };
-    return !!d.success && d.action === "contact" && (d.score ?? 0) >= RECAPTCHA_MIN;
+    return !!d.success && d.action === action && (d.score ?? 0) >= RECAPTCHA_MIN[action];
   } catch { return false; }
 }
 /** one line, no control characters (they could add mail headers), at most `max` characters */
@@ -152,7 +154,7 @@ async function contact(req: Request, env: Env, cors: Record<string, string>, ip:
     return json({ error: "invalid", message: "Please fill in your name, a valid email and a message." }, 400, cors);
   if ((message.match(/https?:\/\//g) ?? []).length > 3) return json({ error: "invalid", message: "Too many links in one message. Email K directly instead." }, 400, cors);
   if (!env.SMTP_USER || !env.SMTP_PASS) return json({ error: "not_set_up" }, 503, cors);
-  if (env.RECAPTCHA_SECRET && !(await recaptchaOk(env.RECAPTCHA_SECRET, b.recaptcha, ip)))
+  if (env.RECAPTCHA_SECRET && !(await recaptchaOk(env.RECAPTCHA_SECRET, b.recaptcha, ip, "contact")))
     return json({ error: "verify", message: "Couldn't confirm you're human. Please email K directly." }, 403, cors);
 
   // a few a day per visitor (IP hashed), and a ceiling for the whole site
@@ -236,11 +238,12 @@ async function hmac(secret: string, data: string) {
   const sig = await crypto.subtle.sign("HMAC", key, new TextEncoder().encode(data));
   return btoa(String.fromCharCode(...new Uint8Array(sig)));
 }
-async function makePass(secret: string) { const exp = String(Date.now() + PASS_MS); return `${exp}.${await hmac(secret, exp)}`; }
-async function checkPass(secret: string, pass: unknown) {
+// the pass is tied to the visitor's IP: copied into a script on another machine, it is useless
+async function makePass(secret: string, ip: string) { const exp = String(Date.now() + PASS_MS); return `${exp}.${await hmac(secret, `${exp}|${ip}`)}`; }
+async function checkPass(secret: string, pass: unknown, ip: string) {
   if (typeof pass !== "string") return false;
   const [exp, sig] = pass.split(".");
-  return !!exp && !!sig && Number(exp) > Date.now() && (await hmac(secret, exp)) === sig;
+  return !!exp && !!sig && Number(exp) > Date.now() && (await hmac(secret, `${exp}|${ip}`)) === sig;
 }
 async function checkTurnstile(secret: string, token: unknown, ip: string) {
   if (typeof token !== "string" || !token) return false;
@@ -268,7 +271,7 @@ export default {
     if (!success) return json({ error: "slow_down", message: "Whoa, too fast! Give it a minute and try again." }, 429, cors);
     if (url.pathname === "/contact") return contact(req, env, cors, ip);
 
-    let body: { messages?: unknown; turnstile?: unknown; pass?: unknown; page?: unknown };
+    let body: { messages?: unknown; turnstile?: unknown; recaptcha?: unknown; pass?: unknown; page?: unknown };
     try { body = await req.json(); } catch { return json({ error: "bad_request" }, 400, cors); }
 
     // the conversation: user/assistant text only, last turns only, short messages
@@ -293,12 +296,18 @@ export default {
     if (verdict === "off") return say(OFF_TOPIC);
     if (verdict === "junk") return say("Hmm, I didn't catch that. Ask me about K's projects, skills or experience!");
 
-    // bot check: a valid pass, or a fresh Turnstile token (then a new pass is handed back)
+    // bot check (the Origin header alone can be faked by a script): a valid pass, or a fresh
+    // human check, Turnstile if it is set up, otherwise reCAPTCHA v3 (action "chat"); then a signed
+    // 30-minute pass, tied to this IP, is handed back so the rest of the chat isn't re-checked
     let newPass: string | null = null;
-    if (env.TURNSTILE_SECRET) {
-      if (!(await checkPass(env.TURNSTILE_SECRET, body.pass))) {
-        if (!(await checkTurnstile(env.TURNSTILE_SECRET, body.turnstile, ip))) return json({ error: "verify", message: "Couldn't verify you're human. Reload and try again." }, 403, cors);
-        newPass = await makePass(env.TURNSTILE_SECRET);
+    const passKey = env.TURNSTILE_SECRET || env.RECAPTCHA_SECRET;
+    if (passKey) {
+      if (!(await checkPass(passKey, body.pass, ip))) {
+        const human = env.TURNSTILE_SECRET
+          ? await checkTurnstile(env.TURNSTILE_SECRET, body.turnstile, ip)
+          : await recaptchaOk(env.RECAPTCHA_SECRET!, body.recaptcha, ip, "chat");
+        if (!human) return json({ error: "verify", message: "Couldn't confirm you're human. Reload the page and try again, or email K at kaungsoe132004@gmail.com." }, 403, cors);
+        newPass = await makePass(passKey, ip);
       }
     }
 

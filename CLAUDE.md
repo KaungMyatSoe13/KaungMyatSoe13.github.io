@@ -499,6 +499,13 @@ notes are history, not instructions. Big-picture map: `src/content/*` (data) →
   tablets side by side. Tech stack = two CSS marquee rows in opposite directions (`.abs__row`).
   Phone page 5344 → 3420 px tall.
 
+- Chat bot check (owner, after an outside security test showed the Worker answered scripts that
+  faked the Origin header): with RECAPTCHA_SECRET set (it is), /chat needs a reCAPTCHA v3 token
+  (action "chat", score >= 0.3; the contact form keeps 0.5) unless it carries a valid pass; the
+  pass is an HMAC over expiry + IP (30 min). AskK sends `recaptcha` until it has a pass and shows
+  Google's required reCAPTCHA line in its footer. Turnstile still wins if TURNSTILE_SECRET is set.
+  localhost isn't in the reCAPTCHA key's domains, so the chat refuses in local dev.
+
 ## Page switch (glitch)
 
 - `src/lib/tv.ts` + `TvLink.tsx` (names kept): showcase "About" and About "Selected work" play

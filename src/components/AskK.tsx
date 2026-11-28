@@ -5,6 +5,7 @@ import { music } from "@/lib/music";
 import { site } from "@/content/site";
 import { projects } from "@/content/projects";
 import Bmo, { type BmoMood, type Emotion } from "./Bmo";
+import { RECAPTCHA_KEY, loadRecaptcha, recaptchaToken } from "@/lib/contact";
 
 /** The Worker that answers (worker/); without it the button doesn't show. */
 const CHAT_URL = process.env.NEXT_PUBLIC_CHAT_URL ?? "";
@@ -123,6 +124,7 @@ export default function AskK() {
 
   useEffect(() => {
     if (!open) return;
+    void loadRecaptcha();                         // the invisible human check, ready before the first question
     inputRef.current?.focus();
     const onKey = (e: KeyboardEvent) => { if (e.key === "Escape") setOpen(false); };
     addEventListener("keydown", onKey);
@@ -164,10 +166,13 @@ export default function AskK() {
     window.setTimeout(() => { if (!started) { mood.current.emotion = "neutral"; mood.current.thinking = true; } }, qFeel === "neutral" ? 0 : 900);
     const put = (t: string) => { answer = t; setMsgs((m) => [...m.slice(0, -1), { role: "assistant", content: t }]); };
     try {
+      // no pass yet: an invisible reCAPTCHA v3 token proves a person is asking (the Worker then
+      // hands back a 30-minute pass, so later questions skip this)
+      const recaptcha = !pass.current && !SITEKEY ? await recaptchaToken("chat") : "";
       const r = await fetch(`${CHAT_URL.replace(/\/$/, "")}/chat`, {
         method: "POST",
         headers: { "content-type": "application/json" },
-        body: JSON.stringify({ messages: history, page: whereNow(), pass: pass.current || undefined, turnstile: pass.current ? undefined : token.current || undefined }),
+        body: JSON.stringify({ messages: history, page: whereNow(), pass: pass.current || undefined, turnstile: pass.current ? undefined : token.current || undefined, recaptcha: recaptcha || undefined }),
       });
       const p = r.headers.get("x-ask-k-pass");
       if (p) pass.current = p;
@@ -248,7 +253,9 @@ export default function AskK() {
           <div ref={tsRef} className="askk__check" />
           <p className="askk__note">
             {note || <>AI · can make mistakes · {/* the model runs on Cloudflare Workers AI: their privacy policy covers the requests */}
-              <a className="askk__privacy-btn" href="https://www.cloudflare.com/privacypolicy/" target="_blank" rel="noopener noreferrer">Privacy</a></>}
+              <a className="askk__privacy-btn" href="https://www.cloudflare.com/privacypolicy/" target="_blank" rel="noopener noreferrer">Privacy</a>
+              {/* reCAPTCHA's badge is hidden site-wide, so Google asks for this line where it is used */}
+              {RECAPTCHA_KEY && <> · protected by reCAPTCHA (Google <a className="askk__privacy-btn" href="https://policies.google.com/privacy" target="_blank" rel="noopener noreferrer">Privacy</a>, <a className="askk__privacy-btn" href="https://policies.google.com/terms" target="_blank" rel="noopener noreferrer">Terms</a>)</>}</>}
           </p>
         </section>
       )}

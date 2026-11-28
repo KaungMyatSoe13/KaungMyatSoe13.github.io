@@ -23,10 +23,11 @@ export function loadRecaptcha(): Promise<Grecaptcha | null> {
   });
   return loading;
 }
-async function recaptchaToken() {
+/** A reCAPTCHA v3 token for one action ("contact", "chat"); "" when reCAPTCHA is off or blocked. */
+export async function recaptchaToken(action = "contact") {
   const g = await loadRecaptcha();
   if (!g) return "";
-  try { return await g.execute(RECAPTCHA_KEY, { action: "contact" }); } catch { return ""; }
+  try { return await g.execute(RECAPTCHA_KEY, { action }); } catch { return ""; }
 }
 
 export type ContactResult = { ok: true } | { ok: false; message: string; fallback?: boolean };
@@ -47,7 +48,7 @@ export async function sendContact(form: FormData): Promise<ContactResult> {
   };
   if (!URL_) return { ok: false, message: "", fallback: true };
   try {
-    const recaptcha = await recaptchaToken();
+    const recaptcha = await recaptchaToken("contact");
     const r = await fetch(`${URL_}/contact`, { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ ...data, recaptcha }) });
     if (r.ok) return { ok: true };
     const d = (await r.json().catch(() => ({}))) as { error?: string; message?: string };
