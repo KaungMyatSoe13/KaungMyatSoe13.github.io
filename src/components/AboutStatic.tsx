@@ -1,36 +1,17 @@
 "use client";
 
 import Link from "next/link";
-import { useEffect, useLayoutEffect, useRef, useState } from "react";
-import { aboutIntro, contact, experience, skills, type SkillIcon } from "@/content/about";
+import { useLayoutEffect, useRef, useState } from "react";
+import { aboutIntro, contact, experience, skills } from "@/content/about";
 import { stack } from "@/content/stack";
 import { site } from "@/content/site";
 import { tvOn } from "@/lib/tv";
 import { lightInk } from "@/lib/stage";
 import { RECAPTCHA_KEY, loadRecaptcha, openMailApp, sendContact } from "@/lib/contact";
-import { drawIcon } from "./AboutStory";
+import ChannelTv from "./ChannelTv";
 import Credits from "./Credits";
 import KLogo from "./KLogo";
 import TvLink from "./TvLink";
-
-/** One skill's icon, drawn once (no particles, no animation). */
-function Icon({ icon }: { icon: SkillIcon }) {
-  const ref = useRef<HTMLCanvasElement>(null);
-  useEffect(() => {
-    const c = ref.current;
-    if (!c) return;
-    let alive = true;
-    (document.fonts?.ready ?? Promise.resolve()).then(() => {
-      if (!alive) return;
-      const g = c.getContext("2d");
-      if (!g) return;
-      g.clearRect(0, 0, c.width, c.height);
-      drawIcon(g, icon);
-    });
-    return () => { alive = false; };
-  }, [icon]);
-  return <canvas ref={ref} className="abs__icon" width={1000} height={720} aria-hidden="true" />;
-}
 
 /** The contact form without the TV: sent through the Worker (Gmail SMTP); the mail app if that fails. */
 function StaticContact() {
@@ -82,6 +63,7 @@ function StaticContact() {
  */
 export default function AboutStatic() {
   const mainRef = useRef<HTMLElement>(null);
+  const [skill, setSkill] = useState(0);
   // the page-in glitch and /about/#contact, as on desktop (skipped while a desktop page is
   // still hydrating this version before it switches to the animated one)
   useLayoutEffect(() => {
@@ -120,28 +102,42 @@ export default function AboutStatic() {
           <p className="abs__note">From the first sketch to the last API call</p>
         </div>
         <h2 id="abs-do" className="sr-only">What I do</h2>
-        <ol className="abs__skills">
-          {skills.map((k, i) => (
-            <li key={k.name}>
-              <Icon icon={k.icon} />
-              <p className="abs__num">{String(i + 1).padStart(2, "0")}</p>
-              <h3>{k.name}</h3>
-              <p className="abs__tag">{k.tagline}</p>
-              <p className="abs__text">{k.body}</p>
-            </li>
-          ))}
-        </ol>
+        {/* a TV with six channels: tap a channel (or swipe the TV), the screen and text change */}
+        <div className="abs__do">
+          <ChannelTv index={skill} onSwipe={(d) => setSkill((v) => (v + d + skills.length) % skills.length)} />
+          <div className="abs__do-side">
+            <div className="abs__chips" role="tablist" aria-label="What I do">
+              {skills.map((k, i) => (
+                <button key={k.name} type="button" role="tab" aria-selected={i === skill} onClick={() => setSkill(i)}>
+                  <b>{String(i + 1).padStart(2, "0")}</b><span>{k.name}</span>
+                </button>
+              ))}
+            </div>
+            <div className="abs__do-text" role="tabpanel" aria-live="polite">
+              <p className="abs__num">CH {String(skill + 1).padStart(2, "0")} · {skills[skill].tagline}</p>
+              <h3>{skills[skill].name}</h3>
+              <p className="abs__text">{skills[skill].body}</p>
+            </div>
+          </div>
+        </div>
       </section>
 
       <section className="abs__sec" aria-label="Tech stack">
-        <ul className="abs__stack">
-          {stack.map((t) => (
-            <li key={t.name} data-main={t.main ? "" : undefined}>
-              <svg viewBox="0 0 24 24" aria-hidden="true"><path d={t.d} fill="currentColor" /></svg>
-              <span>{t.name}</span>
-            </li>
+        {/* two rows of logos gliding past in opposite directions (CSS only; still with reduced motion) */}
+        <div className="abs__marq">
+          {[stack.slice(0, Math.ceil(stack.length / 2)), stack.slice(Math.ceil(stack.length / 2))].map((row, r) => (
+            <div key={r} className="abs__row" data-dir={r}>
+              <ul>
+                {[...row, ...row].map((t, i) => (
+                  <li key={`${t.name}-${i}`} data-main={t.main ? "" : undefined} aria-hidden={i >= row.length || undefined}>
+                    <svg viewBox="0 0 24 24" aria-hidden="true"><path d={t.d} fill="currentColor" /></svg>
+                    <span>{t.name}</span>
+                  </li>
+                ))}
+              </ul>
+            </div>
           ))}
-        </ul>
+        </div>
       </section>
 
       <section className="abs__sec" aria-labelledby="abs-exp">

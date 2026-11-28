@@ -493,6 +493,12 @@ notes are history, not instructions. Big-picture map: `src/content/*` (data) →
   sampling uses typed arrays + a histogram; the six icons / years / form targets are built one
   per frame after the gather or on the first scroll (`prep` queue); icons sampled at half size.
 
+- AboutStatic round 2 (owner: shorter, less ordinary, and a model back on the page): "What I do" =
+  `ChannelTv` (tv.glb via `loadTv`, loaded when near, renders only on a channel change: 4 frames of
+  static then the icon; swipe the TV or tap one of six channel chips) + the chosen skill's text;
+  tablets side by side. Tech stack = two CSS marquee rows in opposite directions (`.abs__row`).
+  Phone page 5344 → 3420 px tall.
+
 ## Page switch (glitch)
 
 - `src/lib/tv.ts` + `TvLink.tsx` (names kept): showcase "About" and About "Selected work" play

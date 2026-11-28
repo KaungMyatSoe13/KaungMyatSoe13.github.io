@@ -1370,3 +1370,41 @@ html[data-ios-safari] .ink-stage, html[data-ios-safari] .sc { height: 100lvh; }
 .grecaptcha-badge { visibility: hidden; }
 .abs__rc { margin: 4px 0 0; max-width: 52ch; font-size: 11px; line-height: 1.5; color: rgba(236, 233, 226, 0.45); }
 .abs__rc a { color: rgba(236, 233, 226, 0.7); }
+
+/* About on phones / tablets, round 2 (owner: shorter, less ordinary): "What I do" is a TV with six
+   channels, the tech stack two gliding rows */
+.abs__do { display: grid; gap: 14px; }
+.abs__tv { position: relative; height: clamp(220px, 34svh, 340px); touch-action: pan-y; }
+.abs__tv canvas { position: absolute; inset: 0; width: 100%; height: 100%; display: block; }
+.abs__tv .abs__icon { position: static; width: 60%; height: auto; margin: 0 auto; }
+.abs__chips { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 6px; }
+.abs__chips button {
+  display: flex; align-items: baseline; gap: 6px; min-width: 0; padding: 9px 8px 8px; cursor: pointer;
+  background: transparent; color: rgba(236, 233, 226, 0.7); border: 1px solid rgba(236, 233, 226, 0.18);
+  font: 11px/1 var(--font-mono); letter-spacing: 0.06em; text-transform: uppercase; text-align: left;
+}
+.abs__chips button b { font: 900 15px/1 var(--font-dot), var(--font-mono); color: inherit; }
+.abs__chips button span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.abs__chips button[aria-selected="true"] { background: #ffd21f; border-color: #ffd21f; color: #0b0b0b; }
+.abs__chips button:focus-visible { outline: 2px solid #ffd21f; outline-offset: 2px; }
+.abs__do-text { min-height: 9.5em; padding-top: 12px; }
+.abs__do-text h3 { margin: 0 0 6px; font: 700 24px/1.1 var(--font-sans); letter-spacing: -0.02em; }
+.abs__marq { display: grid; gap: 18px; }
+.abs__row { overflow: hidden; -webkit-mask-image: linear-gradient(90deg, transparent, #000 10%, #000 90%, transparent); mask-image: linear-gradient(90deg, transparent, #000 10%, #000 90%, transparent); }
+.abs__row ul { list-style: none; margin: 0; padding: 0; display: flex; width: max-content; animation: abs-marq 34s linear infinite; }
+.abs__row[data-dir="1"] ul { animation-direction: reverse; animation-duration: 40s; }
+.abs__row li { width: 86px; flex: none; display: grid; justify-items: center; gap: 8px; color: rgba(236, 233, 226, 0.78); }
+.abs__row li[data-main] { color: #ffd21f; }
+.abs__row svg { width: 32px; height: 32px; }
+.abs__row span { font: 9.5px/1.2 var(--font-mono); letter-spacing: 0.08em; text-transform: uppercase; text-align: center; }
+@keyframes abs-marq { to { transform: translateX(-50%); } }
+@media (prefers-reduced-motion: reduce) { .abs__row { overflow-x: auto; } .abs__row ul { animation: none; } }
+@media (min-width: 761px) {
+  .abs__do { grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); align-items: center; gap: 28px; }
+  .abs__tv { height: clamp(280px, 38svh, 420px); }
+}
+/* narrow phones (iPhone SE): number above the name, so whole names fit */
+@media (max-width: 400px) {
+  .abs__chips button { flex-direction: column; align-items: flex-start; gap: 4px; padding: 8px 7px; }
+  .abs__chips button span { font-size: 10px; letter-spacing: 0.03em; }
+}
