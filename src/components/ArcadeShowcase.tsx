@@ -751,8 +751,15 @@ export default function ArcadeShowcase() {
       // Phones: the arcade at the top, the cards in a row below.
       let aspect = 1, phone = false, sized = "";
       const CARD_D = 6;
+      // Auto quality (desktop). A computer that can't keep up on the landing (a Windows laptop hung
+      // there) steps down: 1 = the ink sim stops (this draws the flood itself, no per-frame copy of
+      // its canvas), half the floating cards, sharpness ≤1.5×; 2 = a third of the cards, 1×.
+      // Remembered for the visit (sessionStorage), so the next page load starts light.
+      const DPR_CAP = [2, 1.5, 1];
+      let qLevel = 0;
+      try { qLevel = Math.min(2, Number(sessionStorage.getItem("kfolio:lite")) || 0); } catch {}
       const fit = () => {
-        const dpr = Math.min(devicePixelRatio || 1, innerWidth <= 1100 ? 1.5 : 2);   // phones / tablets: lighter
+        const dpr = Math.min(devicePixelRatio || 1, innerWidth <= 1100 ? 1.5 : 2, DPR_CAP[qLevel]);   // phones / tablets: lighter
         const w = canvas.clientWidth, h = canvas.clientHeight;
         // resizing a canvas clears it (even to the same size): only when it really changed
         if (sized === `${w}x${h}x${dpr}`) return;
@@ -912,9 +919,26 @@ export default function ArcadeShowcase() {
       const fall = projects.map(() => -1), lift = projects.map(() => 1);
       const FALL_S = 0.42;
       const t0 = performance.now();
+      const applyQuality = () => {
+        if (qLevel > 0) document.documentElement.dataset.lite = String(qLevel); else delete document.documentElement.dataset.lite;
+        floaters.forEach((f, i) => { f.mesh.visible = qLevel === 0 || i % (qLevel === 1 ? 2 : 3) === 0; });
+        sized = ""; fit();
+      };
+      applyQuality();
+      let slowMs = 16, nextQ = 0;
       const frame = (now: number) => {
         raf = requestAnimationFrame(frame);
+        const rawMs = now - last;
         const t = (now - t0) / 1000, dt = Math.min(0.05, (now - last) / 1000); last = now;
+        // auto quality: frame time (smoothed) on the landing, after the first seconds of loading
+        if (!ana && qLevel < 2 && !document.hidden && now - t0 > 2500 && ps < 0.66 && rawMs < 500) {
+          slowMs += (rawMs - slowMs) * 0.06;
+          if (slowMs > 26 && now > nextQ) {                       // under ~38 frames a second
+            qLevel++; slowMs = 16; nextQ = now + 2500;
+            try { sessionStorage.setItem("kfolio:lite", String(qLevel)); } catch {}
+            applyQuality();
+          }
+        }
         if (!reduced) { mx += (tx - mx) * 0.06; my += (ty - my) * 0.06; }
         // scroll progress over the first screen, eased by time so it glides
         const p = Math.min(1, Math.max(0, scrollY / innerHeight));

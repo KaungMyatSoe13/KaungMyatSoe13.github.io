@@ -571,6 +571,8 @@ export default function InkHero({ arcade = false }: { arcade?: boolean }) {
       // corner text: on once the K is full and we're at the top; off once the flood starts
       const corners = introT >= 1 && shown < 0.05 ? "on" : "off";
       if (wrap.dataset.corners !== corners) wrap.dataset.corners = corners;
+      // the arcade turned the quality down (html[data-lite], ArcadeShowcase): no sim, it draws the flood
+      if (arcade && document.documentElement.dataset.lite) { if (wrap.dataset.ink) delete wrap.dataset.ink; return; }
       const aspect = W / H;
       const texel = [1 / vel.read.w, 1 / vel.read.h];
 
@@ -628,7 +630,8 @@ export default function InkHero({ arcade = false }: { arcade?: boolean }) {
 
       // tells the arcade (ArcadeShowcase) the sim really runs, so it uses this ink; until then,
       // or if it never does (shader / GPU trouble), the arcade draws the flood itself
-      if (first) { first = false; setLive(true); wrap.dataset.ink = "sim"; }
+      if (first) { first = false; setLive(true); }
+      if (wrap.dataset.ink !== "sim") wrap.dataset.ink = "sim";
     };
     raf = requestAnimationFrame(frame);
     const onLost = () => { delete wrap.dataset.ink; };

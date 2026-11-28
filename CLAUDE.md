@@ -479,6 +479,12 @@ notes are history, not instructions. Big-picture map: `src/content/*` (data) →
   uses the sim's picture only while that is set, otherwise draws the same flood itself (`anaInk`,
   as on touch). The sim's old plain-fade fallback (`.ink-flood`) is hidden on the arcade home.
 
+- Auto quality on the desktop landing (owner's Windows laptop hung there; the showcase was smooth):
+  ArcadeShowcase smooths the frame time on the landing (after 2.5 s); over ~26 ms it steps
+  `qLevel` 1 → 2 (`applyQuality`): 1 = `html[data-lite]` stops InkHero's sim (the arcade draws the
+  flood, no per-frame canvas copy), half the floating cards, ≤1.5× pixel ratio; 2 = a third of the
+  cards, 1×. Stored in sessionStorage `kfolio:lite` for the visit. Tested with a fake 40 ms frame.
+
 ## Page switch (glitch)
 
 - `src/lib/tv.ts` + `TvLink.tsx` (names kept): showcase "About" and About "Selected work" play
