@@ -474,6 +474,11 @@ notes are history, not instructions. Big-picture map: `src/content/*` (data) →
   NEXT_PUBLIC_RECAPTCHA_SITEKEY (deploy.yml). The badge is hidden (`.grecaptcha-badge`) and the
   required "protected by reCAPTCHA" line shows under the form instead (only when a key is set).
 
+- Desktop ink safety net (owner's Windows laptop showed no flood): InkHero sets
+  `.ink-hero[data-ink="sim"]` after its first real frame (removed on context loss); ArcadeShowcase
+  uses the sim's picture only while that is set, otherwise draws the same flood itself (`anaInk`,
+  as on touch). The sim's old plain-fade fallback (`.ink-flood`) is hidden on the arcade home.
+
 ## Page switch (glitch)
 
 - `src/lib/tv.ts` + `TvLink.tsx` (names kept): showcase "About" and About "Selected work" play

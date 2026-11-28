@@ -733,6 +733,7 @@ export default function ArcadeShowcase() {
       const ana = lightInk();                                     // phones / tablets: the flood is drawn here
       const inkCanvas = ana ? null : document.querySelector<HTMLCanvasElement>(".ink-hero[data-arcade] .ink-canvas");
       const inkTex = inkCanvas ? new THREE.CanvasTexture(inkCanvas) : new THREE.Texture();
+      const inkWrap = inkCanvas?.closest<HTMLElement>(".ink-hero") ?? null;
       inkTex.colorSpace = THREE.SRGBColorSpace;
       const ttex = new THREE.CanvasTexture(bc);
       ttex.wrapS = ttex.wrapT = THREE.RepeatWrapping;
@@ -1103,11 +1104,15 @@ export default function ArcadeShowcase() {
         renderer.clear();
         renderer.render(cscene, ccam);
         renderer.setRenderTarget(null);
-        // ink behind the arcade while it is on screen (it is gone after the drain)
-        const inkOn = !!inkCanvas && (p < 0.66 || ps < 0.66) && inkCanvas.width > 2;
+        // ink behind the arcade while it is on screen (it is gone after the drain). Desktop: the
+        // ink sim's picture, but only while InkHero says its sim runs (`data-ink="sim"`); if it
+        // failed (a Windows laptop showed no flood at all), the flood is drawn here, like on phones.
+        const sim = !ana && !!inkCanvas && inkWrap?.dataset.ink === "sim" && inkCanvas.width > 2;
+        const inkOn = sim && (p < 0.66 || ps < 0.66);
         if (inkOn) inkTex.needsUpdate = true;
         post.uniforms.uInk.value = inkOn ? 1 : 0;
-        if (ana) {
+        post.uniforms.uAna.value = sim ? 0 : 1;
+        if (!sim) {
           // InkHero's timeline: flood 0 → 0.35, drain 0.38 → 0.62 of the first screen
           post.uniforms.uInk.value = ps < 0.66 ? 1 : 0;
           post.uniforms.uP.value = Math.min(1, Math.max(0, ps / 0.35));

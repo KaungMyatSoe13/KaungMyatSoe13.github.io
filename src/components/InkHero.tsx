@@ -626,12 +626,17 @@ export default function InkHero({ arcade = false }: { arcade?: boolean }) {
         u_paper: PAPER,
       });
 
-      if (first) { first = false; setLive(true); }
+      // tells the arcade (ArcadeShowcase) the sim really runs, so it uses this ink; until then,
+      // or if it never does (shader / GPU trouble), the arcade draws the flood itself
+      if (first) { first = false; setLive(true); wrap.dataset.ink = "sim"; }
     };
     raf = requestAnimationFrame(frame);
+    const onLost = () => { delete wrap.dataset.ink; };
+    canvas.addEventListener("webglcontextlost", onLost);
 
     return () => {
       cancelAnimationFrame(raf); releaseGl(canvas);
+      canvas.removeEventListener("webglcontextlost", onLost); delete wrap.dataset.ink;
       window.removeEventListener("load", onLoad);
       io.disconnect();
       window.removeEventListener("pointermove", onMove);

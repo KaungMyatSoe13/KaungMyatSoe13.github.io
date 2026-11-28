@@ -490,6 +490,8 @@ body {
 /* arcade mode: the ink is drawn BEHIND the arcade, inside the showcase's own picture (it reads
    this canvas each frame), so this canvas itself stays invisible */
 .ink-hero[data-arcade] .ink-canvas { opacity: 0; }
+/* the sim's plain-fade fallback would grey the whole page here: the arcade draws the flood itself */
+.ink-hero[data-arcade] .ink-flood { display: none; }
 .ink-hero[data-corners="on"] .hero-corner--tr { transition-delay: 0.08s; }
 .ink-hero[data-corners="on"] .hero-corner--bl { transition-delay: 0.16s; }
 .ink-hero[data-corners="on"] .hero-corner--br { transition-delay: 0.24s; }
