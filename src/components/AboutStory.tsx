@@ -293,9 +293,11 @@ export function drawIcon(g: CanvasRenderingContext2D, icon: SkillIcon) {
 /** Particle targets for one step: its icon drawn offscreen and sampled, as spots on the
  *  "What I do" TV's screen picture (0..1, y down; the shader finds them on the screen). */
 function iconPoints(icon: SkillIcon, N: number) {
-  const W = 1000, H = 720;
+  // drawn at half size: they end up on the small TV screen, and it is a quarter of the pixels to scan
+  const S = 0.5, W = 1000 * S, H = 720 * S;
   const c = document.createElement("canvas"); c.width = W; c.height = H;
   const g = c.getContext("2d", { willReadFrequently: true })!;
+  g.scale(S, S);
   drawIcon(g, icon);
   const d = g.getImageData(0, 0, W, H).data;
   const on: number[] = [];
@@ -417,10 +419,12 @@ function Portrait({ src }: { src: string }) {
         if (d[k + 3] < 128 || bd[k + 3] < 200) continue;               // leave the outline alone
         for (let ch = 0; ch < 3; ch++) d[k + ch] = Math.min(255, Math.max(0, d[k + ch] + 0.9 * (d[k + ch] - bd[k + ch])));
       }
-      const ls: number[] = [];
-      for (let k = 0; k < W * H; k++) if (d[k * 4 + 3] > 128) ls.push((0.299 * d[k * 4] + 0.587 * d[k * 4 + 1] + 0.114 * d[k * 4 + 2]) / 255);
-      ls.sort((a, b) => a - b);
-      const lo = ls[Math.floor(ls.length * 0.03)] ?? 0, hi = ls[Math.floor(ls.length * 0.98)] ?? 1;
+      // the brightness range (3% … 98%) from a histogram (a sort of every pixel was slow)
+      const hist = new Uint32Array(256);
+      let opaque = 0;
+      for (let k = 0; k < W * H; k++) if (d[k * 4 + 3] > 128) { hist[Math.min(255, (0.299 * d[k * 4] + 0.587 * d[k * 4 + 1] + 0.114 * d[k * 4 + 2]) | 0)]++; opaque++; }
+      const pct = (q: number) => { let acc = 0; for (let i = 0; i < 256; i++) { acc += hist[i]; if (acc > opaque * q) return i / 255; } return 1; };
+      const lo = pct(0.03), hi = Math.max(pct(0.98), lo + 1 / 255);
       // the canvas is always the full screen (the year / TV / form targets assume it). Desktop and
       // tablets: the figure is 86% of its height, standing on the bottom edge. Phones: it stands
       // on a line 70% down, so the text fits under it.
@@ -428,7 +432,9 @@ function Portrait({ src }: { src: string }) {
       const HB = phoneFig ? 0.6 : 0.86;                // half-height in clip units
       const DY = phoneFig ? HB - 0.4 : -(1 - HB);      // its feet at y = -0.4 (phones) or the bottom edge
       const sc = (2 * HB) / H;
-      const home: number[] = [], lum: number[] = [];
+      // at most 3 dots per pixel (c < 2.22): room for all of them, filled in place
+      const homeAll = new Float32Array(opaque * 6), lumAll = new Float32Array(opaque * 3);
+      let N = 0;
       for (let j = 0; j < H; j++) for (let i = 0; i < W; i++) {
         const k = (j * W + i) * 4;
         if (d[k + 3] < 128) continue;
@@ -438,14 +444,14 @@ function Portrait({ src }: { src: string }) {
         // shadows stay nearly empty, so the features read (a few dim dots keep the outline)
         const c = 0.12 + 2.1 * Math.pow(l, 1.35);
         const n = Math.floor(c) + (Math.random() < c % 1 ? 1 : 0);
+        const lv = 0.3 + 0.7 * Math.pow(l, 0.8);
         for (let r = 0; r < n; r++) {
-          home.push((i - W / 2 + Math.random() - 0.5) * sc, -(j - H / 2 + Math.random() - 0.5) * sc + DY);
-          lum.push(0.3 + 0.7 * Math.pow(l, 0.8));
+          homeAll[N * 2] = (i - W / 2 + Math.random() - 0.5) * sc; homeAll[N * 2 + 1] = -(j - H / 2 + Math.random() - 0.5) * sc + DY;
+          lumAll[N] = lv; N++;
         }
       }
-      const N = lum.length;
       const vao = gl.createVertexArray(); gl.bindVertexArray(vao);
-      buffer(gl, 0, new Float32Array(home), 2); buffer(gl, 1, new Float32Array(lum), 1);
+      buffer(gl, 0, homeAll.subarray(0, N * 2), 2); buffer(gl, 1, lumAll.subarray(0, N), 1);
       buffer(gl, 2, new Float32Array(N * 3).map(() => Math.random()), 3);
       const dBufs = skills.map((_, i) => buffer(gl, 3 + i, new Float32Array(N * 2), 2));
       const yrBuf = buffer(gl, 9, new Float32Array(N * 2), 2);
@@ -523,13 +529,18 @@ function Portrait({ src }: { src: string }) {
         gl.bindBuffer(gl.ARRAY_BUFFER, yr2Buf);
         gl.bufferData(gl.ARRAY_BUFFER, toScreen(experience[experience.length - 1].year), gl.STATIC_DRAW);
       };
-      const buildDiagrams = () => {
-        skills.forEach((sk, i) => {
-          gl.bindBuffer(gl.ARRAY_BUFFER, dBufs[i]);
-          gl.bufferData(gl.ARRAY_BUFFER, iconPoints(sk.icon, N), gl.STATIC_DRAW);
-        });
+      const buildDiagram = (i: number) => {
+        gl.bindBuffer(gl.ARRAY_BUFFER, dBufs[i]);
+        gl.bufferData(gl.ARRAY_BUFFER, iconPoints(skills[i].icon, N), gl.STATIC_DRAW);
       };
-      (document.fonts?.ready ?? Promise.resolve()).then(() => { buildDiagrams(); buildYear(); buildForm(); });
+      // The shapes the particles fly into further down (six icons, the years, the form) aren't
+      // needed at the top: they are made one per frame once the gathering is done, or as soon as
+      // the visitor scrolls (all at once on load made the gathering freeze and jump).
+      const prep: (() => void)[] = [...skills.map((_, i) => () => buildDiagram(i)), buildYear, buildForm];
+      let fontsOk = false, prepNow = false;
+      (document.fonts?.ready ?? Promise.resolve()).then(() => { fontsOk = true; });
+      const onFirstScroll = () => { prepNow = true; };
+      addEventListener("scroll", onFirstScroll, { once: true, passive: true });
       const qvao = gl.createVertexArray(); gl.bindVertexArray(qvao);
       buffer(gl, 0, new Float32Array([0, 0, 1, 0, 0, 1, 1, 1]), 2);
       const tex = gl.createTexture();
@@ -570,10 +581,13 @@ function Portrait({ src }: { src: string }) {
       addEventListener("pointermove", onMove, { passive: true });
       document.addEventListener("pointerleave", onLeave);
       const reduced = matchMedia("(prefers-reduced-motion: reduce)").matches;
-      const t0 = performance.now();
+      // the gathering's clock starts on the first frame drawn, so setup time never eats into it
+      let t0 = -1;
       const frame = (now: number) => {
         raf = requestAnimationFrame(frame);
+        if (t0 < 0) t0 = now;
         const t = (now - t0) / 1000;
+        if (prep.length && fontsOk && (prepNow || t > 2.4)) prep.shift()!();
         m.sx += (m.x - m.sx) * 0.18; m.sy += (m.y - m.sy) * 0.18;
         // scroll → which shape: the portrait until "What I do" arrives, then one diagram per screen
         const sec = document.querySelector<HTMLElement>(".ab__do");
@@ -707,7 +721,7 @@ function Portrait({ src }: { src: string }) {
       };
       const q8 = new Float32Array(8);
       raf = requestAnimationFrame(frame);
-      cleanup = () => { removeEventListener("resize", onResize); removeEventListener("pointermove", onMove); document.removeEventListener("pointerleave", onLeave); };
+      cleanup = () => { removeEventListener("resize", onResize); removeEventListener("pointermove", onMove); document.removeEventListener("pointerleave", onLeave); removeEventListener("scroll", onFirstScroll); };
     }).catch(() => {});
     return () => { alive = false; cancelAnimationFrame(raf); cleanup(); delete document.documentElement.dataset.cursorBig; releaseGl(canvas); };
   }, [src]);

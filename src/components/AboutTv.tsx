@@ -105,13 +105,21 @@ export default function AboutTv({ turn }: { turn: { x: number; y: number } }) {
       const scrMats: import("three").MeshBasicMaterial[] = [];
       // (phones / tablets: not at all. The TV leaves during the fall there, and three more
       // models to download, parse and compile cost a phone seconds)
-      const later = lightInk() ? 0 : window.setTimeout(() => SHELLS.forEach((sh, i) => {
-        loadShell(THREE, sh, tex2, tv.aspect).then((m) => {
+      // One after another, after the portrait has gathered (3 s), each prepared in small steps and
+      // its shaders compiled before it is ever shown: no freeze on the way (they used to load all
+      // at 1.2 s and stall the page twice for ~0.3 s while the particles gathered).
+      const later = lightInk() ? 0 : window.setTimeout(async () => {
+        for (const [i, sh] of SHELLS.entries()) {
           if (!alive) return;
-          m.visible = false; rig.add(m); models[i + 1] = m;
-          m.traverse((o) => { if (o.name === "screen") scrMats.push((o as import("three").Mesh).material as import("three").MeshBasicMaterial); });
-        }).catch(() => {});
-      }), 1200);
+          try {
+            const m = await loadShell(THREE, sh, tex2, tv.aspect);
+            if (!alive) return;
+            try { await renderer.compileAsync(m, camera, scene); } catch {}
+            m.visible = false; rig.add(m); models[i + 1] = m;
+            m.traverse((o) => { if (o.name === "screen") scrMats.push((o as import("three").Mesh).material as import("three").MeshBasicMaterial); });
+          } catch { /* that one stays out; the main TV covers for it */ }
+        }
+      }, 3000);
 
       let W = 1, H = 1, upp = 1;   // upp: world units per px at the TV's depth
       const fit = () => {

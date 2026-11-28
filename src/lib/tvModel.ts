@@ -73,6 +73,15 @@ export type Shell = {
  */
 export async function loadShell(THREE: typeof Three, shell: Shell, tex: Three.Texture, aspect: number): Promise<Three.Group> {
   const { GLTFLoader } = await import("three/examples/jsm/loaders/GLTFLoader.js");
+  // Finding the glass casts hundreds of rays at the whole model: done in one go it froze the
+  // About page for ~0.3 s per TV (right while the portrait gathered). So it pauses for the next
+  // frame every ~6 ms of work.
+  let slice = performance.now();
+  const breathe = async () => {
+    if (performance.now() - slice < 6) return;
+    await new Promise<void>((r) => requestAnimationFrame(() => r()));
+    slice = performance.now();
+  };
   const gltf = await new GLTFLoader().loadAsync(shell.url);
   const inner = gltf.scene;
   inner.rotation.y = shell.rotY ?? 0;
@@ -107,6 +116,7 @@ export async function loadShell(THREE: typeof Three, shell: Shell, tex: Three.Te
   } else {
     const G = 36;
     for (let j = 0; j <= G; j++) for (let i = 0; i <= G; i++) {
+      await breathe();
       const x = b.min.x + (i / G) * (b.max.x - b.min.x), y = b.min.y + (j / G) * (b.max.y - b.min.y);
       if (isGlass(hit(x, y))) { x0 = Math.min(x0, x); x1 = Math.max(x1, x); y0 = Math.min(y0, y); y1 = Math.max(y1, y); }
     }
@@ -114,7 +124,7 @@ export async function loadShell(THREE: typeof Three, shell: Shell, tex: Three.Te
   if (!isFinite(x0)) return wrap;
   if (shell.outline) {
     const W = b.max.x - b.min.x, H = b.max.y - b.min.y;
-    const glass = outlineMesh(THREE, hit, shell.outline.map(([y, l, r]) => ({ y: b.min.y + y * H, l: b.min.x + l * W, r: b.min.x + r * W })));
+    const glass = await outlineMesh(THREE, hit, breathe, shell.outline.map(([y, l, r]) => ({ y: b.min.y + y * H, l: b.min.x + l * W, r: b.min.x + r * W })));
     glass.material = new THREE.MeshBasicMaterial({ map: tex, toneMapped: false }); glass.name = "screen"; wrap.add(glass);
     return wrap;
   }
@@ -124,6 +134,7 @@ export async function loadShell(THREE: typeof Three, shell: Shell, tex: Three.Te
   const NX = 20, NY = 16, pos: number[] = [], uv: number[] = [], idx: number[] = [];
   let lastZ = b.max.z;
   for (let j = 0; j <= NY; j++) for (let i = 0; i <= NX; i++) {
+    await breathe();
     const u = i / NX, v = j / NY, x = x0 + u * (x1 - x0), y = y0 + v * (y1 - y0);
     const h = hit(x, y);
     const z = h && isGlass(h) ? h.point.z : lastZ;
@@ -212,12 +223,13 @@ export async function measureGlass(THREE: typeof Three, shell: Shell, rowsOut = 
 
 /** A grid over the glass from its outline rows (bottom to top), on the glass's curve; the
  *  picture spans the whole glass (uv = position in its box). */
-function outlineMesh(THREE: typeof Three, hit: (x: number, y: number) => Three.Intersection | undefined, rows: { y: number; l: number; r: number }[]) {
+async function outlineMesh(THREE: typeof Three, hit: (x: number, y: number) => Three.Intersection | undefined, breathe: () => Promise<void>, rows: { y: number; l: number; r: number }[]) {
   const gl = Math.min(...rows.map((q) => q.l)), gr = Math.max(...rows.map((q) => q.r));
   const gb = rows[0].y, gt = rows[rows.length - 1].y;
   const NX = 24, pos: number[] = [], uv: number[] = [], idx: number[] = [];
-  rows.forEach((q, j) => {
+  for (const [j, q] of rows.entries()) {
     for (let i = 0; i <= NX; i++) {
+      await breathe();
       const x = q.l + (i / NX) * (q.r - q.l);
       const h = hit(x, q.y);
       pos.push(x, q.y, (h ? h.point.z : 0) + 0.006);
@@ -227,7 +239,7 @@ function outlineMesh(THREE: typeof Three, hit: (x: number, y: number) => Three.I
       const a = (j - 1) * (NX + 1) + i;
       idx.push(a, a + 1, a + NX + 1, a + 1, a + NX + 2, a + NX + 1);
     }
-  });
+  }
   const geo = new THREE.BufferGeometry();
   geo.setAttribute("position", new THREE.Float32BufferAttribute(pos, 3));
   geo.setAttribute("uv", new THREE.Float32BufferAttribute(uv, 2));

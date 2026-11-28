@@ -485,6 +485,14 @@ notes are history, not instructions. Big-picture map: `src/content/*` (data) →
   flood, no per-frame canvas copy), half the floating cards, ≤1.5× pixel ratio; 2 = a third of the
   cards, 1×. Stored in sessionStorage `kfolio:lite` for the visit. Tested with a fake 40 ms frame.
 
+- About start freeze (owner: a split-second freeze while the portrait gathers, Mac + Windows):
+  measured two ~0.3 s main-thread stalls at ~2 s = `loadShell`'s raycasts (finding each falling
+  TV's glass: hundreds of rays at the whole model). Now `loadShell` yields a frame every ~6 ms
+  (`breathe`), the three shells load one after another from 3 s (after the 2.2 s gather) and are
+  `compileAsync`'d before use. Also: the portrait's clock starts on its first frame; the photo
+  sampling uses typed arrays + a histogram; the six icons / years / form targets are built one
+  per frame after the gather or on the first scroll (`prep` queue); icons sampled at half size.
+
 ## Page switch (glitch)
 
 - `src/lib/tv.ts` + `TvLink.tsx` (names kept): showcase "About" and About "Selected work" play
