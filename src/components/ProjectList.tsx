@@ -177,9 +177,11 @@ export default function ProjectList() {
       <footer className="work-bar work-bar--foot">
         <span>© {year}</span>
         <nav className="work-links" aria-label="Elsewhere">
-          <a className="link" href={site.resume} target="_blank" rel="noopener">
-            Résumé
-          </a>
+          {site.resume && (
+            <a className="link" href={site.resume} target="_blank" rel="noopener">
+              Résumé
+            </a>
+          )}
           {site.socials.map((s) => (
             <a key={s.href} className="link" href={s.href} target="_blank" rel="noopener noreferrer">
               {s.label}

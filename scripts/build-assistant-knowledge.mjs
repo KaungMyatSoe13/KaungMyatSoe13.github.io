@@ -29,7 +29,7 @@ out.push(`- Role: ${site.role}`);
 out.push(`- Based in: ${site.location}`);
 out.push(`- Website: ${site.url}`);
 out.push(`- Email: ${site.email}`);
-out.push(`- Résumé (PDF): ${site.url}${site.resume}`);
+if (site.resume) out.push(`- Résumé (PDF): ${site.url}${site.resume}`);
 for (const s of site.socials) out.push(`- ${s.label}: ${s.href}`);
 
 out.push(`\n## About (from his About page)`);

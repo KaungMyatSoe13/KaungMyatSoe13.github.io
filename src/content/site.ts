@@ -10,7 +10,9 @@ export const site = {
   intro: "Web, mobile and machine-learning projects I designed and built.",
   url: "https://k-the.dev",
   email: "kaungsoe132004@gmail.com",
-  resume: "/files/KaungMyatSoe_CV.pdf",
+  /** The résumé PDF. Empty = every Résumé link is hidden (owner, 2026-11-28: the CV is out of date;
+   *  put "/files/KaungMyatSoe_CV.pdf" back once it is updated, then `npm run knowledge`). */
+  resume: "" as string,
   socials: [
     { label: "GitHub", href: "https://github.com/KaungMyatSoe13" },
     { label: "LinkedIn", href: "https://www.linkedin.com/in/kforsure/" },

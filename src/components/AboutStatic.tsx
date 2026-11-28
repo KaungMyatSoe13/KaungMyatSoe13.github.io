@@ -90,7 +90,7 @@ export default function AboutStatic() {
           {aboutIntro.body.map((b) => <p key={b} className="ab__body abs__body">{b}</p>)}
           <p className="ab__links">
             <a href={`mailto:${site.email}`}>{site.email}</a>
-            <a href={site.resume} target="_blank" rel="noopener">Résumé ↗</a>
+            {site.resume && <a href={site.resume} target="_blank" rel="noopener">Résumé ↗</a>}
             {site.socials.map((s) => <a key={s.href} href={s.href} target="_blank" rel="noopener noreferrer">{s.label} ↗</a>)}
           </p>
         </div>

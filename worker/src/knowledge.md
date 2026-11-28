@@ -4,7 +4,6 @@
 - Based in: Singapore
 - Website: https://k-the.dev
 - Email: kaungsoe132004@gmail.com
-- Résumé (PDF): https://k-the.dev/files/KaungMyatSoe_CV.pdf
 - GitHub: https://github.com/KaungMyatSoe13
 - LinkedIn: https://www.linkedin.com/in/kforsure/
 

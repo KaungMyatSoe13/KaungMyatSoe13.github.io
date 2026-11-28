@@ -1220,7 +1220,7 @@ export default function ArcadeShowcase() {
           <ul className="sc__menu-list">
             <li onPointerEnter={() => { music.blip(); prefetch(...ABOUT_FILES); }} onFocus={() => prefetch(...ABOUT_FILES)}><TvLink className="sc__menu-link" href="/about/">About</TvLink></li>
             <li onPointerEnter={() => music.blip()}><TvLink className="sc__menu-link" href="/about/#contact">Contact us</TvLink></li>
-            <li onPointerEnter={() => music.blip()}><a className="sc__menu-link" href={site.resume} target="_blank" rel="noopener">Resume ↗</a></li>
+            {site.resume && <li onPointerEnter={() => music.blip()}><a className="sc__menu-link" href={site.resume} target="_blank" rel="noopener">Resume ↗</a></li>}
           </ul>
         </div>
         <ol className="sr-only">

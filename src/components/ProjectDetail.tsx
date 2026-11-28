@@ -824,7 +824,7 @@ export default function ProjectDetail({ index }: { index: number }) {
             <ul className="sc__menu-list">
               <li><span className="sc__menu-link">About</span></li>
               <li><span className="sc__menu-link">Contact us</span></li>
-              <li><span className="sc__menu-link">Resume ↗</span></li>
+              {site.resume && <li><span className="sc__menu-link">Resume ↗</span></li>}
             </ul>
           </div>
         </div>
