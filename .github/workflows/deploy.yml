@@ -24,7 +24,8 @@ jobs:
           node-version: 22
           cache: npm
       - run: npm ci
-      - run: npm run build
+      # next/font sometimes fails to fetch a Google font ("Cannot read properties of null"): try again
+      - run: npm run build || (sleep 10 && npm run build) || (sleep 20 && npm run build)
         env:
           # the "Ask K" assistant (worker/); repo Settings → Secrets and variables → Actions → Variables
           NEXT_PUBLIC_CHAT_URL: ${{ vars.NEXT_PUBLIC_CHAT_URL }}
