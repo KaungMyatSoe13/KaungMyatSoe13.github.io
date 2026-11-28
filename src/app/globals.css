@@ -1257,6 +1257,7 @@ html[data-ios-safari] .ink-stage, html[data-ios-safari] .sc { height: 100lvh; }
   position: fixed; left: var(--gutter); bottom: 186px; z-index: 63;
   width: min(380px, calc(100vw - 2 * var(--gutter))); height: min(480px, calc(100svh - 230px));
   display: grid; grid-template-rows: auto 1fr auto auto auto auto;
+  grid-template-columns: minmax(0, 1fr);   /* the column never grows past the window (a long footer line widened it and cut the chat off) */
   background: var(--bg); color: var(--fg); border: 2px solid #ffd21f; box-shadow: 6px 6px 0 rgba(0, 0, 0, 0.45);
   font: 14px/1.5 var(--font-sans); overflow: hidden; animation: gx-text-in 0.45s steps(1) backwards;
 }
@@ -1281,7 +1282,8 @@ html[data-ios-safari] .ink-stage, html[data-ios-safari] .sc { height: 100lvh; }
 .askk__form button:disabled { opacity: 0.4; cursor: default; }
 .askk__check:empty { display: none; }
 .askk__check { padding: 0 12px 6px; }
-.askk__note { margin: 0; padding: 0 12px 10px; font: 10px/1.4 var(--font-mono); letter-spacing: 0.04em; color: var(--soft); white-space: nowrap; }
+.askk__note { margin: 0; padding: 0 12px 10px; font: 10px/1.4 var(--font-mono); letter-spacing: 0.04em; color: var(--soft); }
+.askk__rc { display: block; margin-top: 2px; font-size: 9px; opacity: 0.8; }
 .askk__privacy-btn { color: inherit; text-decoration: underline; text-underline-offset: 2px; }
 .askk__privacy-btn:hover { color: #ffd21f; }
 .askk__note a { color: inherit; }

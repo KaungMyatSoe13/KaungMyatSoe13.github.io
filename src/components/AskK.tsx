@@ -255,7 +255,7 @@ export default function AskK() {
             {note || <>AI · can make mistakes · {/* the model runs on Cloudflare Workers AI: their privacy policy covers the requests */}
               <a className="askk__privacy-btn" href="https://www.cloudflare.com/privacypolicy/" target="_blank" rel="noopener noreferrer">Privacy</a>
               {/* reCAPTCHA's badge is hidden site-wide, so Google asks for this line where it is used */}
-              {RECAPTCHA_KEY && <> · protected by reCAPTCHA (Google <a className="askk__privacy-btn" href="https://policies.google.com/privacy" target="_blank" rel="noopener noreferrer">Privacy</a>, <a className="askk__privacy-btn" href="https://policies.google.com/terms" target="_blank" rel="noopener noreferrer">Terms</a>)</>}</>}
+              {RECAPTCHA_KEY && <span className="askk__rc">Protected by reCAPTCHA · Google <a className="askk__privacy-btn" href="https://policies.google.com/privacy" target="_blank" rel="noopener noreferrer">Privacy</a> · <a className="askk__privacy-btn" href="https://policies.google.com/terms" target="_blank" rel="noopener noreferrer">Terms</a></span>}</>}
           </p>
         </section>
       )}
